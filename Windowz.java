@@ -70,6 +70,8 @@ public class Windowz {
 		m_drawPanel.setImage(bot.getCapture());
 		m_drawPanel.validate();
 		
+		bot.playGame();
+		
 	}
 	
 	private void build ()
