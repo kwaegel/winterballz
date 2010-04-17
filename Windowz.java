@@ -1,4 +1,5 @@
 import java.awt.BorderLayout;
+import java.awt.Dimension;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 
@@ -9,9 +10,11 @@ import javax.swing.JPanel;
 
 public class Windowz {
 
-	JFrame m_frame;
-	JPanel m_buttonPanel;
-	JButton m_calibrateButton;
+	private JFrame m_frame;
+	private JFrame m_sizeFrame;
+	private JPanel m_buttonPanel;
+	private JButton m_calibrateButton;
+	private Dimension m_gameDimension;
 	
 	
 	public Windowz ()
@@ -25,6 +28,7 @@ public class Windowz {
 	{
 		m_frame = new JFrame ("Winter Ballz");
 		m_frame.setSize(400, 200);
+		m_frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		
 		m_buttonPanel = new JPanel ();
 		
@@ -35,6 +39,7 @@ public class Windowz {
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				getScreenCalibration ();
+				
 				
 			}
 			
@@ -63,5 +68,31 @@ public class Windowz {
 	public void getScreenCalibration ()
 	{
 		System.out.println("ENTER SOMETHING");
+		
+		m_sizeFrame = new JFrame ("SIZE ME CORRECTLY !");
+		m_sizeFrame.setSize(500, 500);
+		
+		JPanel bPanel = new JPanel ();
+		
+		JButton finished = new JButton ("Finished");
+		finished.addActionListener( new ActionListener ()
+		{
+
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				
+				m_gameDimension = m_sizeFrame.getSize();
+				m_sizeFrame.setVisible(false);
+				System.out.println(m_gameDimension);
+			}
+			
+		});
+		
+		bPanel.add(finished);
+		
+		m_sizeFrame.setLayout(new BorderLayout ());
+		m_sizeFrame.add(bPanel,BorderLayout.CENTER);
+		m_sizeFrame.setVisible(true);
+		
 	}
 }
