@@ -67,6 +67,7 @@ public class Botz {
 	
 	private Point determineMove (BufferedImage image)
 	{
+		
 		return (new Point (400, 500));
 	}
 	
