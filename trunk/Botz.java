@@ -5,6 +5,7 @@ import java.awt.GraphicsEnvironment;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.Robot;
+import java.awt.event.InputEvent;
 import java.awt.image.BufferedImage;
 
 
@@ -48,6 +49,32 @@ public class Botz {
 		Rectangle r = new Rectangle (x,y,width,height);
 		
 		return (m_robot.createScreenCapture(r));
+	}
+	
+
+	
+	public void playGame ()
+	{
+		Boolean fail = false;
+		
+		while (!fail)
+		{
+			BufferedImage image = getCapture ();
+			Point move = determineMove (image);
+			fail = movePlayer (move);
+		}
+	}
+	
+	private Point determineMove (BufferedImage image)
+	{
+		return (new Point (400, 500));
+	}
+	
+	private Boolean movePlayer (Point move)
+	{
+		m_robot.mouseMove(move.x, move.y);
+		//m_robot.mousePress(InputEvent.);
+		return true;
 	}
 
 }
