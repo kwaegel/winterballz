@@ -9,6 +9,7 @@ import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.Robot;
 
+import java.awt.event.InputEvent;
 import java.awt.image.BufferedImage;
 import java.util.Timer;
 
@@ -64,7 +65,7 @@ public class Botz  {
 		Boolean fail = false;
 		int i  = 0;
 		Timer timer = new Timer ();
-		while (i < 10000)
+		while (i < 100)
 		{
 			m_currentImage = getCapture ();
 			
@@ -136,8 +137,9 @@ public class Botz  {
 		if (move != null)
 		{
 			m_robot.mouseMove(move.x, move.y);
+			m_robot.mousePress(InputEvent.BUTTON1_MASK);
 		}
-			//m_robot.mousePress(InputEvent.);
+			
 		return false;
 	}
 
