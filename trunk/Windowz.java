@@ -32,7 +32,7 @@ public class Windowz implements KeyListener {
 	public void initialize ()
 	{
 		m_frame = new JFrame ("Winter Ballz");
-		m_frame.setSize(800, 600);
+		m_frame.setPreferredSize(new Dimension (800, 600));
 		m_frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		m_frame.addKeyListener(this);
 	
