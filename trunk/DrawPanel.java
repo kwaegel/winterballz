@@ -21,7 +21,7 @@ public class DrawPanel extends JPanel {
 	}
 	
 	public void paintComponent(Graphics g) {
-		super.paintComponent(g);
+		
 		Graphics2D g2d = (Graphics2D) g;
 	    
 		if (m_gameImage != null)
@@ -30,7 +30,7 @@ public class DrawPanel extends JPanel {
 			g2d.drawImage(m_gameImage, null, 0, 0);
 			
 		}
-		repaint ();
+		
 	  
 	  }
 	
