@@ -113,7 +113,7 @@ public class Windowz extends JFrame implements KeyListener {
 		while (true)
 		{
 			bot.update();
-			bot.delay(550);
+			//bot.delay(550);
 		}
 	}
 	
