@@ -1,3 +1,5 @@
+
+
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.Point;
@@ -11,9 +13,13 @@ import javax.swing.JFrame;
 import javax.swing.JPanel;
 
 
-public class Windowz implements KeyListener {
+public class Windowz extends JFrame implements KeyListener {
 
-	private JFrame m_frame;
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 2224732343525761156L;
+
 	private JFrame m_sizeFrame;
 	private JPanel m_buttonPanel;
 	private DrawPanel m_drawPanel;
@@ -24,6 +30,7 @@ public class Windowz implements KeyListener {
 	
 	public Windowz ()
 	{
+		super("Winter Ballz");
 		initialize ();
 		build ();
 		display ();
@@ -31,10 +38,10 @@ public class Windowz implements KeyListener {
 	
 	public void initialize ()
 	{
-		m_frame = new JFrame ("Winter Ballz");
-		m_frame.setPreferredSize(new Dimension (800, 600));
-		m_frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-		m_frame.addKeyListener(this);
+		
+		this.setPreferredSize(new Dimension (800, 600));
+		this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		this.addKeyListener(this);
 	
 		
 		m_buttonPanel = new JPanel ();
@@ -52,7 +59,20 @@ public class Windowz implements KeyListener {
 
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				getScreenCalibration ();
+				
+				Runnable r = new Runnable ()
+				{
+
+					public void run ()
+					{
+						getScreenCalibration ();
+					}
+				};
+
+				new Thread (r).start ();
+				
+				
+				
 				
 				
 			}
@@ -66,7 +86,18 @@ public class Windowz implements KeyListener {
 
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				startRobot ();
+				Runnable r = new Runnable ()
+				{
+
+					public void run ()
+					{
+						startRobot ();
+					}
+				};
+
+				new Thread (r).start ();
+				
+				
 				
 			}
 			
@@ -78,26 +109,31 @@ public class Windowz implements KeyListener {
 	{
 		Botz bot = new Botz (m_gameDimension, m_location);
 		bot.setPanel(m_drawPanel);
-		bot.playGame();
+		
+		while (true)
+		{
+			bot.update();
+			bot.delay(550);
+		}
 	}
 	
 	private void build ()
 	{
 		
-		m_frame.setLayout(new BorderLayout ());
+		this.setLayout(new BorderLayout ());
 		
 		m_buttonPanel.add(m_calibrateButton);
 		m_buttonPanel.add(m_beginButton);
 		
-		m_frame.add(m_buttonPanel, BorderLayout.CENTER);
-		m_frame.add(m_drawPanel,BorderLayout.SOUTH);
+		this.add(m_buttonPanel, BorderLayout.CENTER);
+		this.add(m_drawPanel,BorderLayout.SOUTH);
 		
 	}
 	
 	private void display ()
 	{
-		m_frame.pack();
-		m_frame.setVisible(true);
+		this.pack();
+		this.setVisible(true);
 		
 	}
 	
