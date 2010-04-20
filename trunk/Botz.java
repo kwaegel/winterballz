@@ -12,7 +12,7 @@ import java.awt.Robot;
 
 import java.awt.event.InputEvent;
 import java.awt.image.BufferedImage;
-import java.util.Timer;
+
 
 
 public class Botz  {
@@ -21,7 +21,9 @@ public class Botz  {
 	Dimension m_gameDimension;
 	DrawPanel m_drawPanel;
 	Point m_gameLocation;
+	Point m_previousMove;
 	Robot m_robot;
+	
 
 	public Botz (Dimension d, Point p)
 	{
@@ -62,50 +64,52 @@ public class Botz  {
 
 
 
-	public void playGame ()
+	public void update ()
 	{
 
-		int i  = 0;
-		Timer timer = new Timer ();
-		while (i < 500)
-		{
 			Point move;
 
 			m_currentImage = getCapture ();
 
-			m_currentImage = processImage (m_currentImage);
+			 processImage (m_currentImage);
 
 
-
+			
 
 			//move = determineMove (m_currentImage);
-			move = drawRegion (m_currentImage);
+			move = getMove (m_currentImage);
+			
+			
+			
 
 			m_drawPanel.setImage(m_currentImage);
-			//m_drawPanel.repaint();
+			
 			m_drawPanel.paintImmediately(0, 0, m_currentImage.getWidth(), m_currentImage.getHeight());
 
 
+			
 
-
-			i++;
-
-			movePlayer (move);
-
-
-		}
-
-		try {
-			Thread.sleep(900);
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+			//movePlayer (move);
 
 
 	}
+	
 
-	private BufferedImage processImage (BufferedImage image)
+	
+	private void filterImage (BufferedImage image)
+	{
+		for (int x = 0; x < image.getWidth(); x++)
+		{
+			for (int y = 0; y < 400; y++)
+			{
+				int c = image.getRGB(x, y);
+				
+				//if (c < )
+			}
+		}
+	}
+
+	private void processImage (BufferedImage image)
 	{
 		for (int x = 0; x < image.getWidth(); x++)
 		{
@@ -118,7 +122,12 @@ public class Botz  {
 				}
 			}
 		}
-		return image;
+		
+	}
+	
+	public void delay (int ms)
+	{
+		m_robot.delay(ms);
 	}
 
 	private Point determineMove (BufferedImage image)
@@ -155,16 +164,24 @@ public class Botz  {
 
 	}
 
-	private Point drawRegion (BufferedImage image)
+	private Point getMove (BufferedImage image)
 	{
 		Graphics2D g2d = (Graphics2D)image.getGraphics();
 		g2d.setColor(Color.BLUE);
+		
+		int width = image.getWidth();
+		
+		
+		int column_width = 80;
+		int row_height = 80;
+		int col = width /column_width;
+		int row = 3;
 
 		int x = 0;
-		int y = (3 * image.getHeight())/6;
-		int width = image.getWidth();
+		int y = image.getHeight() - row*row_height;
+		
 		int height = image.getHeight() - y;
-
+		
 		BufferedImage region = image.getSubimage(x, y, width, height);
 		
 		boolean flag = false;
@@ -173,52 +190,59 @@ public class Botz  {
 		int lowest_y = 0;
 		int lowest_count = 10000;
 
-		for (int i = 0; i < 10; i++)
+		for (int r = 0; r < row * row_height; r+= row_height)
 		{
-			for (int j = 0; j < 3; j++)
+			for (int c = 0; c < col * column_width; c += column_width)
 			{
 
-				int [] rgbArray = region.getRGB(0 + (i * width)/10, 0 + (j * height)/3,  width/ 10,   height/3, null, 0, width /10 );
+				int [] rgbArray = region.getRGB(c, r,  column_width,   row_height, null, 0, column_width );
 
 				int wcount = 0;
 
-				for (int c : rgbArray)
+				for (int i : rgbArray)
 				{
-					if (c == Color.WHITE.getRGB())
+					if (i == Color.WHITE.getRGB())
 					{
 						wcount++;
 					}
 
 				}
 
-				g2d.drawRect(0 + (i * width)/10, 0 + height + (j * height)/3, width / 10, height / 3);
-
-				if (wcount > 50)
+				g2d.drawRect(x + c, y + r, column_width, row_height);
+				g2d.drawString("T: " + wcount , x + c, y + r);
+				
+				if (wcount > 80)
 				{
-					g2d.drawString("T: " + wcount , 0 + (i * width)/10, height + (j * height)/3);
+					g2d.setColor(Color.YELLOW);
+					g2d.drawRect(x + c, y + r, column_width, row_height);
+					g2d.setColor(Color.BLUE);
+					
 				}
-				if (wcount < lowest_count && wcount > 50)
+				if (wcount < lowest_count && wcount > 40 && wcount < 60)
 				{
-					lowest_x = 0 + (i * width)/10;
-					lowest_y =  height + (j * height)/3;
+					lowest_x = x + c;
+					lowest_y = y + r;
 					lowest_count = wcount;
 					//g2d.setColor(Color.YELLOW);
 					flag = true;
-					g2d.drawString("LOWEST: " + wcount , 0 + (i * width)/10 + 50, height + (j * height)/3);
+					//g2d.drawString("LOWEST: " + wcount , 0 + (i * width)/10 + 50, height + (j * height)/3);
 
 					//System.out.println("Row " + j + "Col " + i);
 				}
 			}
 		}
 		Point m = null;
+		
 		if (flag)
 		{
-			m = determineMove (image.getSubimage(lowest_x, lowest_y, width/10, height/3));
-		if (m != null)
-		{
-		m.x += lowest_x + m_gameLocation.x;
-		m.y += lowest_y + m_gameLocation.y;
-		}
+			m = determineMove (image.getSubimage(lowest_x, lowest_y, column_width, row_height));
+		
+			
+			if (m != null)
+			{
+				m.x += lowest_x + m_gameLocation.x;
+				m.y += lowest_y + m_gameLocation.y - 150 ;
+			}
 		}	
 		
 		return m;
@@ -236,15 +260,18 @@ public class Botz  {
 
 	private Boolean movePlayer (Point move)
 	{
+		
 		if (move != null)
 		{
+			System.out.println(move);
 			m_robot.mouseMove(move.x, move.y);
 			m_robot.mousePress(InputEvent.BUTTON1_MASK);
-			m_robot.delay(100);
+			//m_robot.delay(200);
+			
 		}
 		else
 		{
-			m_robot.delay(200);
+			//m_robot.delay(200);
 		}
 
 		return false;
