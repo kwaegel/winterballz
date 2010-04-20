@@ -6,6 +6,7 @@ import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
+import java.awt.MouseInfo;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.Robot;
@@ -93,7 +94,7 @@ public class Botz  {
 
 
 
-		movePlayer (move);
+		//movePlayer (move);
 
 
 	}
@@ -154,7 +155,7 @@ public class Botz  {
 		int zone_end  = 0;
 
 		Graphics2D g2d = (Graphics2D) image.getGraphics();
-		g2d.setColor(Color.GREEN);
+		
 
 		//g2d.drawRect(0, zone_end, image.getWidth(),  zone_start - zone_end);
 
@@ -168,7 +169,8 @@ public class Botz  {
 				if (image.getRGB(x, y) == Color.WHITE.getRGB())
 				{
 
-					image.getGraphics().drawOval(x, y, 20, 20);
+					
+					
 					return (new Point (x, y));
 				}
 			}
@@ -239,15 +241,18 @@ public class Botz  {
 					
 					
 					g2d.setColor(Color.RED);
-					g2d.drawRect(x + c, y + r, 50, 50);
+					g2d.drawRect(x + c, y + r, column_width, row_height);
 				
 					flag = true;
 					g2d.setColor(Color.BLUE);
 				}
-				
+				else
+				{
+					g2d.drawRect(x + c, y + r, column_width, row_height);
+				}
 				
 
-				g2d.drawRect(x + c, y + r, column_width, row_height);
+				
 				g2d.drawString("T: " + wcount , x + c, y + r);
 
 			/*	if (cell.getCount() > 500)
@@ -268,6 +273,9 @@ public class Botz  {
 		
 		}
 		
+		g2d.setColor(Color.YELLOW);
+		Point mouse = MouseInfo.getPointerInfo().getLocation();
+		g2d.fillOval(mouse.x, mouse.y, 10, 10);
 		
 		Point m = null;
 
@@ -276,13 +284,18 @@ public class Botz  {
 		
 			m = determineMove (image.getSubimage(lowest_x, lowest_y, column_width, row_height));
 
+		
 
 			if (m != null)
 			{
+				g2d.setColor(Color.CYAN);
+				g2d.fillOval(m.x + lowest_x, m.y + lowest_y, 10, 10);
 				m.x += lowest_x + m_gameLocation.x;
 				m.y += lowest_y + m_gameLocation.y - 100 ;
 			}
 		}	
+		
+		
 
 		return m;
 
