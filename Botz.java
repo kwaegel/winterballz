@@ -24,6 +24,7 @@ public class Botz  {
 	DrawPanel m_drawPanel;
 	Point m_gameLocation;
 	Point m_previousMove;
+	Point m_mouseLoc;
 	Robot m_robot;
 	int rabx = 0;
 	int raby = 0;
@@ -79,12 +80,8 @@ public class Botz  {
 
 		filter();
 
-
-
 		//move = determineMove (m_currentImage);
 		move = getMove (m_currentImage);
-
-
 
 
 		m_drawPanel.setImage(m_currentImage);
@@ -94,7 +91,7 @@ public class Botz  {
 
 
 
-		//movePlayer (move);
+		movePlayer (move);
 
 
 	}
@@ -235,6 +232,8 @@ public class Botz  {
 						break;
 					}
 					
+				
+					
 					lowest_x = x + c;
 					lowest_y = y + r;
 				
@@ -253,29 +252,19 @@ public class Botz  {
 				
 
 				
-				g2d.drawString("T: " + wcount , x + c, y + r);
+				g2d.drawString("T: " + cell.getCount() , x + c, y + r);
 
-			/*	if (cell.getCount() > 500)
-				{
-					g2d.setColor(Color.YELLOW);
-					g2d.drawRect(x + c, y + r, column_width, row_height);
-					rabx = x + c;
-					raby = y + c;
-					g2d.setColor(Color.BLUE);
-				
-
-				}*/
-				
-				
-			
+						
 			}
 			
 		
 		}
 		
 		g2d.setColor(Color.YELLOW);
-		Point mouse = MouseInfo.getPointerInfo().getLocation();
-		g2d.fillOval(mouse.x, mouse.y, 10, 10);
+		
+		m_mouseLoc = MouseInfo.getPointerInfo().getLocation();
+		
+		g2d.fillOval(m_mouseLoc.x - m_gameLocation.x , m_mouseLoc.y - m_gameLocation.y , 10, 10);
 		
 		Point m = null;
 
@@ -290,8 +279,8 @@ public class Botz  {
 			{
 				g2d.setColor(Color.CYAN);
 				g2d.fillOval(m.x + lowest_x, m.y + lowest_y, 10, 10);
-				m.x += lowest_x + m_gameLocation.x;
-				m.y += lowest_y + m_gameLocation.y - 100 ;
+				m.x += lowest_x + m_gameLocation.x + 15;
+				m.y += lowest_y + m_gameLocation.y ;
 			}
 		}	
 		
@@ -323,7 +312,7 @@ public class Botz  {
 		}
 		else
 		{
-			//m_robot.delay(200);
+			System.out.println("NO MOVE");
 		}
 
 		return false;
