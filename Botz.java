@@ -12,6 +12,7 @@ import java.awt.Robot;
 
 import java.awt.event.InputEvent;
 import java.awt.image.BufferedImage;
+import java.util.ArrayList;
 
 
 
@@ -23,6 +24,8 @@ public class Botz  {
 	Point m_gameLocation;
 	Point m_previousMove;
 	Robot m_robot;
+	int rabx = 0;
+	int raby = 0;
 	
 
 	public Botz (Dimension d, Point p)
@@ -67,46 +70,59 @@ public class Botz  {
 	public void update ()
 	{
 
-			Point move;
+		Point move;
 
-			m_currentImage = getCapture ();
+		m_currentImage = getCapture ();
 
-			 processImage (m_currentImage);
+		//processImage (m_currentImage);
 
-
-			
-
-			//move = determineMove (m_currentImage);
-			move = getMove (m_currentImage);
-			
-			
-			
-
-			m_drawPanel.setImage(m_currentImage);
-			
-			m_drawPanel.paintImmediately(0, 0, m_currentImage.getWidth(), m_currentImage.getHeight());
+		filter();
 
 
-			
 
-			//movePlayer (move);
+		//move = determineMove (m_currentImage);
+		move = getMove (m_currentImage);
+
+
+
+
+		m_drawPanel.setImage(m_currentImage);
+
+		m_drawPanel.paintImmediately(0, 0, m_currentImage.getWidth(), m_currentImage.getHeight());
+
+
+
+
+		movePlayer (move);
 
 
 	}
-	
 
-	
-	private void filterImage (BufferedImage image)
-	{
-		for (int x = 0; x < image.getWidth(); x++)
-		{
-			for (int y = 0; y < 400; y++)
+	private int[] rgbToRGBArray(int value) {
+		int[] rgb = new int[3];
+		value = value >> 8;
+		rgb[0] = value & 0xFF;
+		value = value >> 8;
+		rgb[1] = value & 0xFF;
+		value = value >> 8;
+		rgb[2] = value & 0xFF;
+		return rgb;
+	}
+
+
+
+	private void filter() {
+		for (int x = 0; x < m_currentImage.getWidth(); x++) {
+			for (int y = 0; y < m_currentImage.getHeight (); y++)
 			{
-				int c = image.getRGB(x, y);
-				
-				//if (c < )
+				int rgb = m_currentImage.getRGB(x, y);
+				int[] RGB = rgbToRGBArray(rgb);
+				if (m_currentImage.getHeight() - y < 80 || RGB[0] < 200 || RGB[1] < 200 || RGB[2] < 200)
+					m_currentImage.setRGB(x, y, 0);
+				else
+					m_currentImage.setRGB(x, y, Color.WHITE.getRGB());
 			}
-		}
+		} 
 	}
 
 	private void processImage (BufferedImage image)
@@ -122,9 +138,9 @@ public class Botz  {
 				}
 			}
 		}
-		
+
 	}
-	
+
 	public void delay (int ms)
 	{
 		m_robot.delay(ms);
@@ -153,7 +169,7 @@ public class Botz  {
 				{
 
 					image.getGraphics().drawOval(x, y, 20, 20);
-					return (new Point ( x, y));
+					return (new Point (x, y));
 				}
 			}
 		}
@@ -168,85 +184,108 @@ public class Botz  {
 	{
 		Graphics2D g2d = (Graphics2D)image.getGraphics();
 		g2d.setColor(Color.BLUE);
-		
+
 		int width = image.getWidth();
-		
-		
+
+
 		int column_width = 80;
 		int row_height = 80;
 		int col = width /column_width;
-		int row = 3;
+		int row = 4;
 
 		int x = 0;
 		int y = image.getHeight() - row*row_height;
-		
+
 		int height = image.getHeight() - y;
-		
+
 		BufferedImage region = image.getSubimage(x, y, width, height);
-		
+
 		boolean flag = false;
 
 		int lowest_x = 0;
 		int lowest_y = 0;
-		int lowest_count = 10000;
+
+
+		
+	
 
 		for (int r = 0; r < row * row_height; r+= row_height)
 		{
+			int row_count = 0;
+			int rownum = r / row_height;
+		
+			
 			for (int c = 0; c < col * column_width; c += column_width)
 			{
 
-				int [] rgbArray = region.getRGB(c, r,  column_width,   row_height, null, 0, column_width );
+				Cell cell = new Cell ( region.getRGB(c, r,  column_width,   row_height, null, 0, column_width ));
 
 				int wcount = 0;
+				
+				int colnum = c / column_width;
 
-				for (int i : rgbArray)
+				if (cell.isOccupied(200, 550))
 				{
-					if (i == Color.WHITE.getRGB())
+					row_count++;
+					
+					if (row_count > 1 && rownum != 0 )
 					{
-						wcount++;
+						break;
 					}
-
+					
+					lowest_x = x + c;
+					lowest_y = y + r;
+				
+					
+					
+					g2d.setColor(Color.RED);
+					g2d.drawRect(x + c, y + r, 50, 50);
+				
+					flag = true;
+					g2d.setColor(Color.BLUE);
 				}
+				
+				
 
 				g2d.drawRect(x + c, y + r, column_width, row_height);
 				g2d.drawString("T: " + wcount , x + c, y + r);
-				
-				if (wcount > 80)
+
+			/*	if (cell.getCount() > 500)
 				{
 					g2d.setColor(Color.YELLOW);
 					g2d.drawRect(x + c, y + r, column_width, row_height);
+					rabx = x + c;
+					raby = y + c;
 					g2d.setColor(Color.BLUE);
-					
-				}
-				if (wcount < lowest_count && wcount > 40 && wcount < 60)
-				{
-					lowest_x = x + c;
-					lowest_y = y + r;
-					lowest_count = wcount;
-					//g2d.setColor(Color.YELLOW);
-					flag = true;
-					//g2d.drawString("LOWEST: " + wcount , 0 + (i * width)/10 + 50, height + (j * height)/3);
+				
 
-					//System.out.println("Row " + j + "Col " + i);
-				}
+				}*/
+				
+				
+			
 			}
-		}
-		Point m = null;
+			
 		
+		}
+		
+		
+		Point m = null;
+
 		if (flag)
 		{
-			m = determineMove (image.getSubimage(lowest_x, lowest_y, column_width, row_height));
 		
-			
+			m = determineMove (image.getSubimage(lowest_x, lowest_y, column_width, row_height));
+
+
 			if (m != null)
 			{
 				m.x += lowest_x + m_gameLocation.x;
-				m.y += lowest_y + m_gameLocation.y - 150 ;
+				m.y += lowest_y + m_gameLocation.y - 100 ;
 			}
 		}	
-		
+
 		return m;
-		
+
 		//return (new Point (m_gameLocation.x + lowest_x, m_gameLocation.y+lowest_y));
 
 
@@ -260,14 +299,14 @@ public class Botz  {
 
 	private Boolean movePlayer (Point move)
 	{
-		
+
 		if (move != null)
 		{
 			System.out.println(move);
 			m_robot.mouseMove(move.x, move.y);
-			m_robot.mousePress(InputEvent.BUTTON1_MASK);
-			//m_robot.delay(200);
+			//	m_robot.mousePress(InputEvent.BUTTON1_MASK);
 			
+
 		}
 		else
 		{
