@@ -1,4 +1,3 @@
-import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
@@ -9,6 +8,8 @@ import javax.swing.JPanel;
 
 public class DrawPanel extends JPanel {
 
+	private static final long serialVersionUID = 5638434499479432884L;
+	
 	BufferedImage m_gameImage;
 	int m_zone_start;
 	int m_zone_end;
@@ -25,6 +26,7 @@ public class DrawPanel extends JPanel {
 		m_zone_end  = m_gameImage.getHeight() / 2;
 	}
 	
+	@Override
 	public void paintComponent(Graphics g) {
 		
 		Graphics2D g2d = (Graphics2D) g;

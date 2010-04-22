@@ -11,7 +11,6 @@ import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.Robot;
 
-import java.awt.event.InputEvent;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
@@ -48,7 +47,7 @@ public class Botz  {
 
 
 		try {
-			m_robot = new Robot (screen[0]);
+			m_robot = new Robot ();
 
 
 		} catch (AWTException e) {
@@ -107,42 +106,37 @@ public class Botz  {
 		List<Rectangle> recs = extractFeatures ();
 		Graphics2D g2d = (Graphics2D)m_currentImage.getGraphics();
 		
-		if (rabbitLoc != null)
-		{
-			g2d.setColor(Color.CYAN);
-			g2d.fillOval(rabbitLoc.x, rabbitLoc.y, 10, 10);
-		}
 		for (Rectangle r: recs)
 		{
 			
 			Cell c = new Cell (m_currentImage.getRGB(r.x,r.y,r.width,r.height, null, 0, r.width));
 			
-			System.out.println(c.getCount());
+			//System.out.println(c.getCount());
 			
-			System.out.println(r.width - r.height);
+			//System.out.println(r.width - r.height);
 			
 			//check for rabbit
-			//if (rabbitLoc == null)
-			//{
-				// try to find rabbit
-				if (r.width - r.height > 15)
+			if (rabbitLoc == null)
+			{
+				//try to find rabbit
+				if (c.getCount() > 300)
 				{
 					rabbitLoc = new Point((int)r.getCenterX(), (int)r.getCenterY());
 					System.out.println("FOUND RABBIT");
 				}
 				
 				
-		//	}
-		//	else 
-		//	{
-//				// update rabbit location
-//				if (r.contains(rabbitLoc))
-//				{
-//					rabbitLoc = new Point((int)r.getCenterX(), (int)r.getCenterY());
-//				
-//				}
-//			//}
-//			
+			}
+			else 
+			{
+				// update rabbit location
+				if (c.getCount() > 350)
+				{
+					rabbitLoc = new Point((int)r.getCenterX(), (int)r.getCenterY());
+				
+				}
+			}
+			
 			
 			
 			
@@ -150,16 +144,25 @@ public class Botz  {
 			if (rabbitLoc != null && r.contains(rabbitLoc))
 			{
 				g2d.setColor(Color.YELLOW);
+				g2d.drawRect(r.x, r.y, r.width, r.height);
 			}
-			if (r.width > 10)
+			else if (r.width > 10)
 			{
 				g2d.setColor(Color.RED);
+				g2d.drawRect(r.x, r.y, r.width, r.height);
 			} else {
 				g2d.setColor(Color.GREEN);
+				g2d.drawRect(r.x, r.y, r.width, r.height);
 			}
-			g2d.drawRect(r.x, r.y, r.width, r.height);
 			g2d.setColor(Color.WHITE);
-		} 			
+		}
+		
+		if (rabbitLoc != null)
+		{
+			g2d.setColor(Color.CYAN);
+			g2d.fillOval(rabbitLoc.x, rabbitLoc.y, 10, 10);
+		}
+		
 	}
 	
 	
@@ -190,14 +193,22 @@ public class Botz  {
 					
 					if (!skip){
 						Rectangle newRect = expandRect(y, x);
-						if (newRect.width > 10 && newRect.height > 10)
+						
+						skip = false;
+						
+						for (Rectangle otherRect : rectList){
+							if (newRect.intersects(otherRect))
+								skip = true;
+						}
+						
+						
+						if (!skip && newRect.width > 10 && newRect.height > 10)
 							rectList.add(newRect);
 					}
+					
 				}
 			}
 		}
-		
-		
 		
 		return rectList;
 		

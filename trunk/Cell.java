@@ -1,8 +1,4 @@
 import java.awt.Color;
-import java.awt.image.BufferedImage;
-import java.awt.image.ColorModel;
-import java.awt.image.WritableRaster;
-import java.util.Hashtable;
 
 
 public class Cell  {
@@ -25,7 +21,7 @@ public class Cell  {
 		m_count = 0;
 		for (int i : m_rgbArray)
 		{
-			if (i == Color.WHITE.getRGB())
+			if (i == Color.BLACK.getRGB())
 			{
 				m_count++;
 			}
