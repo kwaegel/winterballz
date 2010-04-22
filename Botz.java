@@ -161,6 +161,7 @@ public class Botz  {
 		{
 			g2d.setColor(Color.CYAN);
 			g2d.fillOval(rabbitLoc.x, rabbitLoc.y, 10, 10);
+			
 		}
 		
 	}
