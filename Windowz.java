@@ -158,7 +158,7 @@ public class Windowz extends JFrame implements KeyListener {
 				m_gameDimension = m_sizeFrame.getSize();
 				m_location = m_sizeFrame.getLocationOnScreen();
 				m_sizeFrame.setVisible(false);
-				System.out.println(m_gameDimension);
+				//System.out.println(m_gameDimension);
 			}
 			
 		});

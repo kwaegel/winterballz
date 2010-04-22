@@ -26,6 +26,7 @@ public class Botz  {
 	Point m_gameLocation;
 	Point m_previousMove;
 	Point m_mouseLoc;
+	Point rabbitLoc;
 	Robot m_robot;
 	int rabx = 0;
 	int raby = 0;
@@ -37,8 +38,8 @@ public class Botz  {
 		m_gameDimension = d;
 		m_gameLocation = p;
 
-		System.out.println("Dimension" + m_gameDimension);
-		System.out.println("Location" + m_gameLocation);
+		//System.out.println("Dimension" + m_gameDimension);
+		//System.out.println("Location" + m_gameLocation);
 
 		GraphicsEnvironment ge = GraphicsEnvironment.
 		getLocalGraphicsEnvironment();
@@ -106,13 +107,59 @@ public class Botz  {
 		List<Rectangle> recs = extractFeatures ();
 		Graphics2D g2d = (Graphics2D)m_currentImage.getGraphics();
 		
+		if (rabbitLoc != null)
+		{
+			g2d.setColor(Color.CYAN);
+			g2d.fillOval(rabbitLoc.x, rabbitLoc.y, 10, 10);
+		}
 		for (Rectangle r: recs)
 		{
-			g2d.drawRect(r.x, r.y, r.width, r.height);
 			
-		}
-		
-		
+			Cell c = new Cell (m_currentImage.getRGB(r.x,r.y,r.width,r.height, null, 0, r.width));
+			
+			System.out.println(c.getCount());
+			
+			System.out.println(r.width - r.height);
+			
+			//check for rabbit
+			//if (rabbitLoc == null)
+			//{
+				// try to find rabbit
+				if (r.width - r.height > 15)
+				{
+					rabbitLoc = new Point((int)r.getCenterX(), (int)r.getCenterY());
+					System.out.println("FOUND RABBIT");
+				}
+				
+				
+		//	}
+		//	else 
+		//	{
+//				// update rabbit location
+//				if (r.contains(rabbitLoc))
+//				{
+//					rabbitLoc = new Point((int)r.getCenterX(), (int)r.getCenterY());
+//				
+//				}
+//			//}
+//			
+			
+			
+			
+			// switch color based on estimated object type
+			if (rabbitLoc != null && r.contains(rabbitLoc))
+			{
+				g2d.setColor(Color.YELLOW);
+			}
+			if (r.width > 10)
+			{
+				g2d.setColor(Color.RED);
+			} else {
+				g2d.setColor(Color.GREEN);
+			}
+			g2d.drawRect(r.x, r.y, r.width, r.height);
+			g2d.setColor(Color.WHITE);
+		} 			
 	}
 	
 	
@@ -123,17 +170,34 @@ public class Botz  {
 		List<Rectangle> rectList = new ArrayList<Rectangle> ();
 		
 		
-		for (int x = 0; x < m_currentImage.getWidth(); x++)
+		for (int x = 0; x < m_currentImage.getWidth() -1; x++)
 		{
-			for (int y = 0; y < m_currentImage.getHeight (); y++)
+			for (int y = 0 ; y < m_currentImage.getHeight () -1; y++)
 			{
-
+				
 				if (isWhite(m_currentImage.getRGB(x, y)))
 				{
-					rectList.add(expandRect(y, x));
+					// check if pixel is inside a previous rectangle
+					boolean skip = false;
+					for (Rectangle oldRect : rectList)
+					{
+						if (oldRect.contains(x, y))
+						{
+							skip = true;
+							break;
+						}
+					}
+					
+					if (!skip){
+						Rectangle newRect = expandRect(y, x);
+						if (newRect.width > 10 && newRect.height > 10)
+							rectList.add(newRect);
+					}
 				}
 			}
 		}
+		
+		
 		
 		return rectList;
 		
@@ -149,21 +213,26 @@ public class Botz  {
 		
 		while (bA[0] || bA[1] || bA[2] || bA[3])
 		{
-			
+			// grow up
 			if (bA[0])
 			{
 				r.y -= 1;
 				r.height++;
 			}
+			
+			// grow right
 			if (bA[1])
 			{
-				r.x -= 1;
 				r.width++;
 			}
+			
+			// grow down
 			if (bA[2])
 			{
 				r.height++;
 			}
+			
+			// grow left
 			if (bA[3])
 			{
 				r.x -= 1;
@@ -178,67 +247,78 @@ public class Botz  {
 		
 	}
 	
+	
+	private boolean inBounds (Rectangle r)
+	{
+		Rectangle imageBounds = new Rectangle (1,1, m_currentImage.getWidth() - 1, m_currentImage.getHeight() - 1);
+		
+		return (imageBounds.contains(r));
+	}
+	
+	
 	private boolean [] checkBorders (Rectangle r)
 	{
 		boolean [] bArray = new boolean [4];
+		
+		
 		//check top
-		
-		
-		
+
 		int row = r.y - 1;
-		
+
 		if (row > 0 )
 		{
-		for (int c = r.x; c <= r.x + r.width; c++)
-		{
-			if (isWhite (m_currentImage.getRGB(c, row)))
+			for (int c = r.x; c <= r.x + r.width; c++)
+			{
+				if (isWhite (m_currentImage.getRGB(c, row)))
 				{
-				bArray[0] = true;
-				break;
+					bArray[0] = true;
+					break;
 				}
+			}
 		}
-		}
+
+
 		//check right
-		
+
 		int col = r.x + r.width + 1;
 		if (col < m_currentImage.getWidth())
 		{
-		for ( row = r.y; row <= r.y + r.height; row ++)
-		{
-			if (isWhite (m_currentImage.getRGB(col, row)))
+			for ( row = r.y; row <= r.y + r.height; row ++)
+			{
+				if (isWhite (m_currentImage.getRGB(col, row)))
 				{
-				bArray[1] = true;
-				break;
+					bArray[1] = true;
+					break;
 				}
+			}
 		}
-		}
-		
+
 		//check bottom
-		
+
 		row = r.y + r.height + 1;
 		if (row < m_currentImage.getHeight())
 		{
-		for (int c = r.x; c <= r.x + r.width; c++)
-		{
-			if (isWhite (m_currentImage.getRGB(c, row)))
+			for (int c = r.x; c <= r.x + r.width; c++)
+			{
+				if (isWhite (m_currentImage.getRGB(c, row)))
 				{
-				bArray[2] = true;
-				break;
+					bArray[2] = true;
+					break;
 				}
-		}
+			}
 		}
 		//check left
 		col = r.x - 1;
 		if (col > 0)
 		{
-		for ( row = r.y; row <= r.y + r.height; row ++)
-		{
-			if (isWhite (m_currentImage.getRGB(col, row)))
+			for ( row = r.y; row <= r.y + r.height; row ++)
+			{
+				if (isWhite (m_currentImage.getRGB(col, row)))
 				{
-				bArray[3] = true;
-				break;
+					bArray[3] = true;
+					break;
 				}
-		}
+			}
 		}
 		return bArray;
 	}
