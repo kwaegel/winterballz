@@ -14,6 +14,7 @@ import java.awt.Robot;
 import java.awt.event.InputEvent;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
+import java.util.List;
 
 
 
@@ -28,6 +29,7 @@ public class Botz  {
 	Robot m_robot;
 	int rabx = 0;
 	int raby = 0;
+	ArrayList<Rectangle> bells = new ArrayList<Rectangle> ();
 	
 
 	public Botz (Dimension d, Point p)
@@ -81,9 +83,10 @@ public class Botz  {
 		filter();
 
 		//move = determineMove (m_currentImage);
-		move = getMove (m_currentImage);
+		//move = getMove (m_currentImage);
 
-
+		test ();
+		
 		m_drawPanel.setImage(m_currentImage);
 
 		m_drawPanel.paintImmediately(0, 0, m_currentImage.getWidth(), m_currentImage.getHeight());
@@ -91,10 +94,155 @@ public class Botz  {
 
 
 
-		movePlayer (move);
+		//movePlayer (move);
 
 
 	}
+	
+	
+	private void test ()
+	{
+		
+		List<Rectangle> recs = extractFeatures ();
+		Graphics2D g2d = (Graphics2D)m_currentImage.getGraphics();
+		
+		for (Rectangle r: recs)
+		{
+			g2d.drawRect(r.x, r.y, r.width, r.height);
+			
+		}
+		
+		
+	}
+	
+	
+	private List<Rectangle> extractFeatures ()
+	{
+		
+		
+		List<Rectangle> rectList = new ArrayList<Rectangle> ();
+		
+		
+		for (int x = 0; x < m_currentImage.getWidth(); x++)
+		{
+			for (int y = 0; y < m_currentImage.getHeight (); y++)
+			{
+
+				if (isWhite(m_currentImage.getRGB(x, y)))
+				{
+					rectList.add(expandRect(y, x));
+				}
+			}
+		}
+		
+		return rectList;
+		
+	}
+	
+	private Rectangle expandRect (int row, int col)
+	{
+		
+		Rectangle r = new Rectangle (col, row, 1, 1);
+		
+		boolean [] bA = checkBorders (r);
+		
+		
+		while (bA[0] || bA[1] || bA[2] || bA[3])
+		{
+			
+			if (bA[0])
+			{
+				r.y -= 1;
+				r.height++;
+			}
+			if (bA[1])
+			{
+				r.x -= 1;
+				r.width++;
+			}
+			if (bA[2])
+			{
+				r.height++;
+			}
+			if (bA[3])
+			{
+				r.x -= 1;
+				r.width++;
+			}
+		
+			bA = checkBorders(r);
+		}
+		
+		
+		return r;
+		
+	}
+	
+	private boolean [] checkBorders (Rectangle r)
+	{
+		boolean [] bArray = new boolean [4];
+		//check top
+		
+		
+		
+		int row = r.y - 1;
+		
+		if (row > 0 )
+		{
+		for (int c = r.x; c <= r.x + r.width; c++)
+		{
+			if (isWhite (m_currentImage.getRGB(c, row)))
+				{
+				bArray[0] = true;
+				break;
+				}
+		}
+		}
+		//check right
+		
+		int col = r.x + r.width + 1;
+		if (col < m_currentImage.getWidth())
+		{
+		for ( row = r.y; row <= r.y + r.height; row ++)
+		{
+			if (isWhite (m_currentImage.getRGB(col, row)))
+				{
+				bArray[1] = true;
+				break;
+				}
+		}
+		}
+		
+		//check bottom
+		
+		row = r.y + r.height + 1;
+		if (row < m_currentImage.getHeight())
+		{
+		for (int c = r.x; c <= r.x + r.width; c++)
+		{
+			if (isWhite (m_currentImage.getRGB(c, row)))
+				{
+				bArray[2] = true;
+				break;
+				}
+		}
+		}
+		//check left
+		col = r.x - 1;
+		if (col > 0)
+		{
+		for ( row = r.y; row <= r.y + r.height; row ++)
+		{
+			if (isWhite (m_currentImage.getRGB(col, row)))
+				{
+				bArray[3] = true;
+				break;
+				}
+		}
+		}
+		return bArray;
+	}
+	
 
 	private int[] rgbToRGBArray(int value) {
 		int[] rgb = new int[3];
@@ -297,6 +445,11 @@ public class Botz  {
 	private boolean discardPixel (int c)
 	{
 		return (c != Color.WHITE.getRGB());
+	}
+	
+	private boolean isWhite (int c)
+	{
+		return (c == Color.WHITE.getRGB());
 	}
 
 	private Boolean movePlayer (Point move)
