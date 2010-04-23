@@ -2,7 +2,6 @@ package winterBallz;
 
 import java.awt.AWTException;
 import java.awt.Color;
-import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.MouseInfo;
 import java.awt.Point;
@@ -14,11 +13,13 @@ import java.util.Collections;
 import java.util.List;
 
 public class Botz {
+	
+	private static final int gridSize = 9;
 
 	BufferedImage m_currentImage;
-	Dimension m_gameDimension;
+	Rectangle m_gameArea;
 	DrawPanel m_drawPanel;
-	Point m_gameLocation;
+	boolean m_allowMove = true;
 	Point m_previousMove;
 	Point m_mouseLoc;
 	Point rabbitLoc;
@@ -27,9 +28,10 @@ public class Botz {
 	int raby = 0;
 	ArrayList<Rectangle> bells = new ArrayList<Rectangle>();
 
-	public Botz(Dimension d, Point p) {
-		m_gameDimension = d;
-		m_gameLocation = p;
+	public Botz(Rectangle bounds, DrawPanel panel) {
+		m_drawPanel = panel;
+		
+		m_gameArea = new Rectangle(bounds);
 
 		try {
 			m_robot = new Robot();
@@ -38,40 +40,50 @@ public class Botz {
 		}
 	}
 
-	public BufferedImage getCapture() {
-		int x, y, width, height;
-		x = m_gameLocation.x;
-		y = m_gameLocation.y;
-		width = m_gameDimension.width;
-		height = m_gameDimension.height;
-
-		Rectangle r = new Rectangle(x, y, width, height);
-
-		return (m_robot.createScreenCapture(r));
-	}
-
 	public void update() {
 
-		m_currentImage = getCapture();
+		// capture the screen
+		m_currentImage = m_robot.createScreenCapture(m_gameArea);
+		
+		// filter out extraneous image data
+		filterImage(m_currentImage);
+		
+		// extract a list of features from the image
+		List<SpatialRect> rectList = extractFeatures(m_currentImage);
+		
+		// draw the rectangles on the image and make a move
+		drawRectangles(rectList);
+		
+		// calculate the best move for the rabbit to make
+		Point move = getMove(rectList);
+		
+		// make the move
+		if(m_allowMove)
+			movePlayer(move);
+		
 
-		filter();
-
-		// move = determineMove (m_currentImage);
-		// move = getMove (m_currentImage);
-
-		test();
-
+		// put the diagnostic image in the panel and draw
 		m_drawPanel.setImage(m_currentImage);
-
 		m_drawPanel.paintImmediately(0, 0, m_currentImage.getWidth(), m_currentImage.getHeight());
-
-		// movePlayer (move);
 
 	}
 
-	private void test() {
+	private Point getMove(List<SpatialRect> rectList) {
+		
+		Point move = findNearest(rectList, rabbitLoc);
 
-		List<SpatialRect> recs = extractFeatures();
+		if (move.x + move.y != 0) {
+			move.x += m_gameArea.x;
+			move.y += m_gameArea.y;
+			movePlayer(move);
+		}
+		
+		return move;
+	}
+
+	private void drawRectangles(List<SpatialRect> recs) {
+
+		
 		Graphics2D g2d = (Graphics2D) m_currentImage.getGraphics();
 
 		for (SpatialRect r : recs) {
@@ -100,41 +112,13 @@ public class Botz {
 			g2d.setColor(Color.WHITE);
 		}
 
-		Point move = findNearest(recs, rabbitLoc);
-
-		if (move.x + move.y != 0) {
-			move.x += m_gameLocation.x;
-			move.y += m_gameLocation.y;
-			//System.out.println("Moving " + move);
-			movePlayer(move);
-		}
+		
 
 	}
 
 	private Point findNearest(List<SpatialRect> list, Point rabbitLocation) {
 		Point p = new Point();
 
-		/*
-		 * if (rabbitLocation != null) { Double distancesq = Double.MAX_VALUE;
-		 * 
-		 * for (SpatialRect r : list) { if (r.getType() !=
-		 * SpatialRect.Type.RABBIT) {
-		 * 
-		 * Double d = Point.distanceSq(rabbitLocation.getX(),
-		 * rabbitLocation.getY(), r.getCenterX(), r .getCenterY());
-		 * 
-		 * 
-		 * 
-		 * 
-		 * if (d < distancesq && r.getCenterY() - rabbitLocation.y < 160 &&
-		 * rabbitLocation.y < r.getCenterY())
-		 * 
-		 * 
-		 * if (r.getCenterY() > p.y) { //distancesq = d;
-		 * p.setLocation(r.getCenterX(), r.getCenterY()); }
-		 * 
-		 * } } }
-		 */
 		if (list.size() > 2) {
 			Collections.sort(list, new SpatialCompare());
 
@@ -143,19 +127,16 @@ public class Botz {
 		}
 
 		return p;
-
-		// Point center = new Point (r.)
-
 	}
 
-	private List<SpatialRect> extractFeatures() {
+	private List<SpatialRect> extractFeatures(BufferedImage image) {
 
 		List<SpatialRect> rectList = new ArrayList<SpatialRect>();
 
-		for (int x = 0; x < m_currentImage.getWidth() - 1; x++) {
-			for (int y = 0; y < m_currentImage.getHeight() - 1; y++) {
+		for (int x = 0; x < image.getWidth() - 1; x += gridSize) {
+			for (int y = 0; y < image.getHeight() - 1; y += gridSize) {
 
-				if (isWhite(m_currentImage.getRGB(x, y))) {
+				if (isWhite(image.getRGB(x, y))) {
 					// check if pixel is inside a previous rectangle
 					boolean skip = false;
 					for (Rectangle oldRect : rectList) {
@@ -196,6 +177,7 @@ public class Botz {
 
 		boolean[] bA = checkBorders(r);
 
+		// if there is a white pixel on any side of the rectangle, grow the rectangel in that direction
 		while (bA[0] || bA[1] || bA[2] || bA[3]) {
 			// grow up
 			if (bA[0]) {
@@ -219,6 +201,7 @@ public class Botz {
 				r.width++;
 			}
 
+			// check around the borders again
 			bA = checkBorders(r);
 		}
 
@@ -289,129 +272,20 @@ public class Botz {
 		return rgb;
 	}
 
-	private void filter() {
-		for (int x = 0; x < m_currentImage.getWidth(); x++) {
-			for (int y = 0; y < m_currentImage.getHeight(); y++) {
-				int rgb = m_currentImage.getRGB(x, y);
-				int[] RGB = rgbToRGBArray(rgb);
-				if (m_currentImage.getHeight() - y < 30 || RGB[0] < 200 || RGB[1] < 200 || RGB[2] < 200) {
-					m_currentImage.setRGB(x, y, 0);
-				} else {
-					m_currentImage.setRGB(x, y, Color.WHITE.getRGB());
-				}
-			}
-		}
-	}
-
-	public void delay(int ms) {
-		m_robot.delay(ms);
-	}
-
-	private Point determineMove(BufferedImage image) {
-
-		int zone_start = image.getHeight() - 1;
-		int zone_end = 0;
-
-		// g2d.drawRect(0, zone_end, image.getWidth(), zone_start - zone_end);
-
+	private void filterImage(BufferedImage image) {
+		
 		for (int x = 0; x < image.getWidth(); x++) {
-
-			for (int y = zone_start; y > zone_end; y--) {
-
-				if (image.getRGB(x, y) == Color.WHITE.getRGB()) {
-
-					return (new Point(x, y));
-				}
-			}
-		}
-
-		return null;
-
-	}
-
-	@SuppressWarnings("unused")
-	private Point getMove(BufferedImage image) {
-		Graphics2D g2d = (Graphics2D) image.getGraphics();
-		g2d.setColor(Color.BLUE);
-
-		int width = image.getWidth();
-
-		int column_width = 80;
-		int row_height = 80;
-		int col = width / column_width;
-		int row = 4;
-
-		int x = 0;
-		int y = image.getHeight() - row * row_height;
-
-		int height = image.getHeight() - y;
-
-		BufferedImage region = image.getSubimage(x, y, width, height);
-
-		boolean flag = false;
-
-		int lowest_x = 0;
-		int lowest_y = 0;
-
-		for (int r = 0; r < row * row_height; r += row_height) {
-			int row_count = 0;
-			int rownum = r / row_height;
-
-			for (int c = 0; c < col * column_width; c += column_width) {
-
-				Cell cell = new Cell(region.getRGB(c, r, column_width, row_height, null, 0, column_width));
-
-				if (cell.isOccupied(200, 550)) {
-					row_count++;
-
-					if (row_count > 1 && rownum != 0) {
-						break;
-					}
-
-					lowest_x = x + c;
-					lowest_y = y + r;
-
-					g2d.setColor(Color.RED);
-					g2d.drawRect(x + c, y + r, column_width, row_height);
-
-					flag = true;
-					g2d.setColor(Color.BLUE);
+			for (int y = 0; y < image.getHeight(); y++) {
+				int rgb = image.getRGB(x, y);
+				int[] RGB = rgbToRGBArray(rgb);
+				if (image.getHeight() - y < 30 || RGB[0] < 200 || RGB[1] < 200 || RGB[2] < 200) {
+					image.setRGB(x, y, 0);
 				} else {
-					g2d.drawRect(x + c, y + r, column_width, row_height);
+					image.setRGB(x, y, Color.WHITE.getRGB());
 				}
-
-				g2d.drawString("T: " + cell.getCount(), x + c, y + r);
-
-			}
-
-		}
-
-		g2d.setColor(Color.YELLOW);
-
-		m_mouseLoc = MouseInfo.getPointerInfo().getLocation();
-
-		g2d.fillOval(m_mouseLoc.x - m_gameLocation.x, m_mouseLoc.y - m_gameLocation.y, 10, 10);
-
-		Point m = null;
-
-		if (flag) {
-
-			m = determineMove(image.getSubimage(lowest_x, lowest_y, column_width, row_height));
-
-			if (m != null) {
-				g2d.setColor(Color.CYAN);
-				g2d.fillOval(m.x + lowest_x, m.y + lowest_y, 10, 10);
-				m.x += lowest_x + m_gameLocation.x + 15;
-				m.y += lowest_y + m_gameLocation.y;
 			}
 		}
-
-		return m;
-
-		// return (new Point (m_gameLocation.x + lowest_x,
-		// m_gameLocation.y+lowest_y));
-
-		// g2d.drawRect(x, y, width, height);
+		
 	}
 
 	@SuppressWarnings("unused")
@@ -427,19 +301,16 @@ public class Botz {
 
 		if (move != null) {
 			//System.out.println(move);
-			m_robot.mouseMove(move.x, move.y);
-			// m_robot.mousePress(InputEvent.BUTTON1_MASK);
+			
+			// only move the mouse horizontally
+			Point mousePos = MouseInfo.getPointerInfo().getLocation();
+			m_robot.mouseMove(move.x, mousePos.y);
 
 		} else {
 			//System.out.println("NO MOVE");
 		}
 
 		return false;
-	}
-
-	public void setPanel(DrawPanel panel) {
-		m_drawPanel = panel;
-
 	}
 
 }
