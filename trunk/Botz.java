@@ -139,7 +139,7 @@ public class Botz {
 	private Point findNearest(List<SpatialRect> list, Point rabbitLocation) {
 		Point p = new Point();
 
-		/*if (rabbitLocation != null) {
+		if (rabbitLocation != null) {
 			Double distancesq = Double.MAX_VALUE;
 
 			for (SpatialRect r : list) {
@@ -150,29 +150,37 @@ public class Botz {
 									.getCenterY());
 					
 					
-					
-					
 					if (d < distancesq &&
 						r.getCenterY() - rabbitLocation.y < 160 &&
 						rabbitLocation.y < r.getCenterY()) 
-					
-					
-					if (r.getCenterY() > p.y)
 					{
-						//distancesq = d;
-						p.setLocation(r.getCenterX(), r.getCenterY());
-					}
+					
+						
+						if (r.getCenterY() > p.y)
+						{
+							distancesq = d;
+							p.setLocation(r.getCenterX(), r.getCenterY());
+						}
 
-				}
+					}
 			}
-		}*/
-		if (list.size() > 2)
+		}
+		}
+	
+		
+	/*	if (list.size() > 2)
 		{
 			Collections.sort(list, new SpatialCompare ());
 		
 			p.x = (int)list.get(1).getCenterX();
 			p.y = (int)list.get(1).getCenterY();
-		}
+			
+			Double d1 = Point.distanceSq(rabbitLocation.getX(),
+					rabbitLocation.getY(), p.x,p.y);
+			
+			
+		
+		}*/
 		
 		return p;
 
