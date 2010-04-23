@@ -7,18 +7,13 @@ import java.awt.MouseInfo;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.Robot;
-import java.awt.geom.Point2D;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.FutureTask;
 
 public class Botz {
 	
@@ -33,14 +28,14 @@ public class Botz {
 	private Point m_target;
 	private Robot m_robot;
 	
-	private ExecutorService pixelExpanders;
+	ExecutorService rectangleExtractors;
 
 	public Botz(Rectangle bounds, DrawPanel panel) {
 		m_drawPanel = panel;
 		
 		m_gameArea = new Rectangle(bounds);
 		
-
+		rectangleExtractors = Executors.newCachedThreadPool();
 		
 		
 		try {
@@ -85,7 +80,6 @@ public class Botz {
 			return null;
 		
 		// TODO change m_target to a rectangle to make sure it intersects the last rectangle position?
-		
 		
 		// check if our target bell is still on the screen
 		Point move = null;
@@ -196,124 +190,89 @@ public class Botz {
 		
 		List<Rectangle> features = new ArrayList<Rectangle>();
 		
-		//TODO divide the image into four segments and search each quadrant with a separate thread
-		ExecutorService rectangleExtractors = Executors.newFixedThreadPool(4);
+		//rectangleExtractors = Executors.newFixedThreadPool(4);
 		
-		// create four tasks to search the image
-		Rectangle bounds = new Rectangle(0,0,image.getWidth()-1, image.getHeight()-1);
-		FeatureExtractor fxt = new FeatureExtractor(bounds, image);
+		// divide the image into separate areas with black borders
+		List<Rectangle> sections = new ArrayList<Rectangle>(4);// = this.divideImage(image, 1);
+		List<Future<Pair<List<Rectangle>, Rectangle>>> asyncResults = new ArrayList<Future<Pair<List<Rectangle>, Rectangle>>>();
 		
-		Future<Pair<List<Rectangle>, Rectangle>> resultsAsyc = rectangleExtractors.submit(fxt);
+		// create four tasks to search each area
+		sections.add(new Rectangle(0,0,image.getWidth()/2, image.getHeight()));
+		sections.add(new Rectangle(image.getWidth()/2,0,image.getWidth()/2, image.getHeight()));
 		
-		try {
-			Pair<List<Rectangle>, Rectangle> results = resultsAsyc.get();
+		// start threads
+		for (Rectangle bounds : sections) {
+			FeatureExtractor fxt = new FeatureExtractor(bounds, image);
+			asyncResults.add(rectangleExtractors.submit(fxt));
+		}
+		
+		// wait for thread results
+		for (Future<Pair<List<Rectangle>, Rectangle>> ar : asyncResults)
+		{	
+			try {
+			Pair<List<Rectangle>, Rectangle> results = ar.get();
 			features.addAll( results.first );
 			
 			// check if this thread found the rabbit
 			if (results.second != null)
 				m_rabbit = results.second;
 			
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		} catch (ExecutionException e) {
-			e.printStackTrace();
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			} catch (ExecutionException e) {
+				e.printStackTrace();
+			}
 		}
 		
+		
+		
+		
+		
 		// ensure all the threads are finished.
-		rectangleExtractors.shutdown();
+		//rectangleExtractors.shutdown();
 
 		return features;
 
 	}
-
-	private Rectangle expandRectangle(int row, int col) {
-
-		Rectangle r = new Rectangle(col, row, 1, 1);
-
-		boolean[] bA = checkBorders(r);
-
-		// if there is a white pixel on any side of the rectangle, grow the rectangel in that direction
-		while (bA[0] || bA[1] || bA[2] || bA[3]) {
-			// grow up
-			if (bA[0]) {
-				r.y -= 1;
-				r.height++;
-			}
-
-			// grow right
-			if (bA[1]) {
-				r.width++;
-			}
-
-			// grow down
-			if (bA[2]) {
-				r.height++;
-			}
-
-			// grow left
-			if (bA[3]) {
-				r.x -= 1;
-				r.width++;
-			}
-
-			// check around the borders again
-			bA = checkBorders(r);
-		}
-
-		return r;
-
-	}
-
-	private boolean[] checkBorders(Rectangle r) {
-		boolean[] bArray = new boolean[4];
-
-		// check top
-
-		int row = r.y - 1;
-
-		if (row > 0) {
-			for (int c = r.x; c <= r.x + r.width; c++) {
-				if (isWhite(m_currentImage.getRGB(c, row))) {
-					bArray[0] = true;
+	
+	// divide up the image vertically
+	private List<Rectangle> divideImage(BufferedImage image, int sections) {
+		
+		List<Rectangle> list = new ArrayList<Rectangle>();
+		
+		int step = (int)(image.getWidth() / sections)-1;
+		boolean collision = false;
+		
+		int x,y,height,width;
+		
+		x=y=0;
+		int col=step;
+		while ( !collision && col < image.getWidth() )
+		{
+			for (int row = 0; row < image.getHeight(); row++){
+				// make sure the column is empty of white pixels
+				if (isWhite(image.getRGB(col, row)))
+				{
+					collision = true;
 					break;
 				}
 			}
-		}
-
-		// check right
-
-		int col = r.x + r.width + 1;
-		if (col < m_currentImage.getWidth()) {
-			for (row = r.y; row <= r.y + r.height; row++) {
-				if (isWhite(m_currentImage.getRGB(col, row))) {
-					bArray[1] = true;
-					break;
-				}
+			
+			if (!collision)
+			{
+				height = image.getHeight();
+				width = col - x;
+				list.add(new Rectangle(x,y,height,width));
+				col += step;
+			}
+			else
+			{
+				col++;
+				collision = false;
 			}
 		}
-
-		// check bottom
-
-		row = r.y + r.height + 1;
-		if (row < m_currentImage.getHeight()) {
-			for (int c = r.x; c <= r.x + r.width; c++) {
-				if (isWhite(m_currentImage.getRGB(c, row))) {
-					bArray[2] = true;
-					break;
-				}
-			}
-		}
-		// check left
-		col = r.x - 1;
-		if (col > 0) {
-			for (row = r.y; row <= r.y + r.height; row++) {
-				if (isWhite(m_currentImage.getRGB(col, row))) {
-					bArray[3] = true;
-					break;
-				}
-			}
-		}
-		return bArray;
+		
+		return list;
 	}
 
 	private int[] rgbToRGBArray(int value) {
@@ -343,15 +302,6 @@ public class Botz {
 		
 	}
 
-	@SuppressWarnings("unused")
-	private boolean discardPixel(int c) {
-		return (c != Color.WHITE.getRGB());
-	}
-
-	private boolean isWhite(int c) {
-		return (c == Color.WHITE.getRGB());
-	}
-
 	private Boolean movePlayer(Point move) {
 
 		if (move != null) {
@@ -366,6 +316,10 @@ public class Botz {
 		}
 
 		return false;
+	}
+	
+	public static boolean isWhite(int c) {
+		return (c == Color.WHITE.getRGB());
 	}
 
 }

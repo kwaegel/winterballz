@@ -12,7 +12,7 @@ public class FeatureExtractor implements Callable<Pair<List<Rectangle>, Rectangl
 	
 	Rectangle m_area;
 	BufferedImage m_image;
-
+	
 	public FeatureExtractor(Rectangle searchArea, BufferedImage image) {
 		
 		m_area = searchArea;
@@ -48,7 +48,6 @@ public class FeatureExtractor implements Callable<Pair<List<Rectangle>, Rectangl
 
 							// update rabbit location
 							if (c.getCount() > 350) {
-								// TODO fix this...
 								m_rabbit = newRectangle;
 								continue nextPixel;
 							}
@@ -71,48 +70,6 @@ public class FeatureExtractor implements Callable<Pair<List<Rectangle>, Rectangl
 
 	}
 	
-	private static boolean isWhite(int c) {
-		return (c == Color.WHITE.getRGB());
-	}
-	
-	private Rectangle expandRectangle(int row, int col, BufferedImage image) {
-
-		Rectangle r = new Rectangle(col, row, 1, 1);
-
-		boolean[] bA = checkBorders(r, image);
-
-		// if there is a white pixel on any side of the rectangle, grow the rectangel in that direction
-		while (bA[0] || bA[1] || bA[2] || bA[3]) {
-			// grow up
-			if (bA[0]) {
-				r.y -= 1;
-				r.height++;
-			}
-
-			// grow right
-			if (bA[1]) {
-				r.width++;
-			}
-
-			// grow down
-			if (bA[2]) {
-				r.height++;
-			}
-
-			// grow left
-			if (bA[3]) {
-				r.x -= 1;
-				r.width++;
-			}
-
-			// check around the borders again
-			bA = checkBorders(r, m_image);
-		}
-
-		return r;
-
-	}
-
 	private boolean[] checkBorders(Rectangle r, BufferedImage image) {
 		boolean[] bArray = new boolean[4];
 
@@ -163,6 +120,48 @@ public class FeatureExtractor implements Callable<Pair<List<Rectangle>, Rectangl
 			}
 		}
 		return bArray;
+	}
+
+	private Rectangle expandRectangle(int row, int col, BufferedImage image) {
+
+		Rectangle r = new Rectangle(col, row, 1, 1);
+
+		boolean[] bA = checkBorders(r, image);
+
+		// if there is a white pixel on any side of the rectangle, grow the rectangel in that direction
+		while (bA[0] || bA[1] || bA[2] || bA[3]) {
+			// grow up
+			if (bA[0]) {
+				r.y -= 1;
+				r.height++;
+			}
+
+			// grow right
+			if (bA[1]) {
+				r.width++;
+			}
+
+			// grow down
+			if (bA[2]) {
+				r.height++;
+			}
+
+			// grow left
+			if (bA[3]) {
+				r.x -= 1;
+				r.width++;
+			}
+
+			// check around the borders again
+			bA = checkBorders(r, m_image);
+		}
+
+		return r;
+
+	}
+	
+	public static boolean isWhite(int c) {
+		return (c == Color.WHITE.getRGB());
 	}
 
 }
