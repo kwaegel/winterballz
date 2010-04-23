@@ -7,6 +7,7 @@ public class Cell  {
 	private int m_count;
 	private int m_row;
 	private int m_col;
+	public boolean isRabbit = false;
 	
 	
 	public Cell (int [] rgbArray)
@@ -28,6 +29,8 @@ public class Cell  {
 
 		}
 	}
+	
+	
 	
 	public int getCount ()
 	{
