@@ -7,32 +7,37 @@ import java.awt.MouseInfo;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.Robot;
+import java.awt.geom.Point2D;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class Botz {
 	
-	private static final int gridSize = 9;
+	private static final int verticalRes = 10;
+	private static final int horzRes = 7;
 
-	BufferedImage m_currentImage;
-	Rectangle m_gameArea;
-	DrawPanel m_drawPanel;
-	boolean m_allowMove = true;
-	Point m_previousMove;
-	Point m_mouseLoc;
-	Point rabbitLoc;
-	Robot m_robot;
-	int rabx = 0;
-	int raby = 0;
-	ArrayList<Rectangle> bells = new ArrayList<Rectangle>();
+	private BufferedImage m_currentImage;
+	private Rectangle m_gameArea;
+	private DrawPanel m_drawPanel;
+	private boolean m_allowMove = false;
+	private Rectangle m_rabbit;
+	private Robot m_robot;
+	
+	private ExecutorService pixelExpanders;
 
 	public Botz(Rectangle bounds, DrawPanel panel) {
 		m_drawPanel = panel;
 		
 		m_gameArea = new Rectangle(bounds);
+		
 
+		
+		
 		try {
 			m_robot = new Robot();
 		} catch (AWTException e) {
@@ -49,129 +54,152 @@ public class Botz {
 		filterImage(m_currentImage);
 		
 		// extract a list of features from the image
-		List<SpatialRect> rectList = extractFeatures(m_currentImage);
+		List<Rectangle> rectList = extractFeatures(m_currentImage);
 		
 		// draw the rectangles on the image and make a move
-		drawRectangles(rectList);
+		drawFeatures(rectList);
 		
 		// calculate the best move for the rabbit to make
 		Point move = getMove(rectList);
 		
 		// make the move
-		if(m_allowMove)
+		if(m_allowMove && move != null)
 			movePlayer(move);
 		
 
-		// put the diagnostic image in the panel and draw
+		// put the filtered image in the panel and draw
 		m_drawPanel.setImage(m_currentImage);
 		m_drawPanel.paintImmediately(0, 0, m_currentImage.getWidth(), m_currentImage.getHeight());
 
 	}
 
-	private Point getMove(List<SpatialRect> rectList) {
+	private Point getMove(List<Rectangle> rectList) {
 		
-		Point move = findNearest(rectList, rabbitLoc);
-
-		if (move.x + move.y != 0) {
-			move.x += m_gameArea.x;
-			move.y += m_gameArea.y;
-			movePlayer(move);
+		// we can't get a move if we don't know where the rabbit is...
+		if (m_rabbit == null)
+			return null;
+		
+		// get current screen to draw prediction lines on
+		Graphics2D g2d = (Graphics2D) m_currentImage.getGraphics();
+		
+		Point closestBell = this.findNearest(rectList, m_rabbit.getLocation());	
+		
+		Point move = null;
+		
+		if (closestBell != null)
+			move = new Point(closestBell.x + m_gameArea.x, closestBell.y + m_gameArea.y);
+		
+		if (move != null)
+		{
+			g2d.setColor(Color.magenta);
+			g2d.drawLine(closestBell.x, closestBell.y, m_rabbit.x, m_rabbit.y);
 		}
 		
 		return move;
 	}
+	
+	public static int getSquaredDistance (Point p1, Point p2)
+	{
+		return (p1.x - p2.x)*(p1.x - p2.x) + (p1.y - p2.y)*(p1.y - p2.y);
+	}
 
-	private void drawRectangles(List<SpatialRect> recs) {
+	private void drawFeatures(List<Rectangle> recs) {
 
 		
 		Graphics2D g2d = (Graphics2D) m_currentImage.getGraphics();
 
-		for (SpatialRect r : recs) {
-
-			Cell c = new Cell(m_currentImage.getRGB(r.x, r.y, r.width, r.height, null, 0, r.width));
-
-			// update rabbit location
-			if (c.getCount() > 350) {
-				rabbitLoc = new Point((int) r.getCenterX(), (int) r.getCenterY());
-
-			}
-
-			// switch color based on estimated object type
-			if (rabbitLoc != null && r.contains(rabbitLoc)) {
-				r.setType(SpatialRect.Type.RABBIT);
-				g2d.setColor(Color.YELLOW);
-				g2d.drawRect(r.x, r.y, r.width, r.height);
-
-			} else if (r.width > 10) {
+		for (Rectangle r : recs) {
+			if (r.width > 10) {
 				g2d.setColor(Color.RED);
 				g2d.drawRect(r.x, r.y, r.width, r.height);
 			} else {
 				g2d.setColor(Color.GREEN);
 				g2d.drawRect(r.x, r.y, r.width, r.height);
 			}
-			g2d.setColor(Color.WHITE);
 		}
 
-		
+		if (m_rabbit != null){
+			g2d.setColor(Color.yellow);
+			g2d.drawRect(m_rabbit.x, m_rabbit.y, m_rabbit.width, m_rabbit.height);
+		}
 
 	}
 
-	private Point findNearest(List<SpatialRect> list, Point rabbitLocation) {
-		Point p = new Point();
+	private Point findNearest(List<Rectangle> list, Point rabbitLocation) {
 
+		Rectangle closestFeature = null;
 		if (list.size() > 2) {
-			Collections.sort(list, new SpatialCompare());
-
-			p.x = (int) list.get(1).getCenterX();
-			p.y = (int) list.get(1).getCenterY();
+			
+			int closest = Integer.MAX_VALUE;
+			
+			for (Rectangle r : list) {
+				int distance = (int) Point2D.distance(r.getCenterX(), r.getCenterY(), m_rabbit.getCenterX(), m_rabbit.getCenterY());
+				
+				if (distance < closest){
+					closest = distance;
+					closestFeature = r;
+				}
+			}
 		}
-
-		return p;
+		
+		if (closestFeature == null)
+			return null;
+		return closestFeature.getLocation();
 	}
 
-	private List<SpatialRect> extractFeatures(BufferedImage image) {
+	private List<Rectangle> extractFeatures(BufferedImage image) {
+		
+		// reset rabbit each frame
+		m_rabbit = null;
+		
+		List<Rectangle> features = new ArrayList<Rectangle>();
 
-		List<SpatialRect> rectList = new ArrayList<SpatialRect>();
-
-		for (int x = 0; x < image.getWidth() - 1; x += gridSize) {
-			for (int y = 0; y < image.getHeight() - 1; y += gridSize) {
+		for (int x = 0; x < image.getWidth() - 1; x += horzRes) {
+			nextPixel:
+			for (int y = 0; y < image.getHeight() - 1; y += verticalRes) {
 
 				if (isWhite(image.getRGB(x, y))) {
-					// check if pixel is inside a previous rectangle
-					boolean skip = false;
-					for (Rectangle oldRect : rectList) {
+					
+					// skip pixel if it is inside a previous rectangle
+					for (Rectangle oldRect : features) {
 						if (oldRect.contains(x, y)) {
-							skip = true;
-							break;
+							continue nextPixel;
 						}
 					}
 
-					if (!skip) {
-						SpatialRect newRect = new SpatialRect(expandRect(y, x));
-						// Rectangle newRect = expandRect(y, x);
+					//SpatialRectangle newRect = new SpatialRectangle(expandRect(y, x));
+					Rectangle newRectangle = expandRectangle(y, x);
 
-						skip = false;
+					// only add large rectangles
+					if (newRectangle.width > 10 && newRectangle.height > 10)
+					{
+						Cell c = new Cell(m_currentImage.getRGB(newRectangle.x, newRectangle.y, newRectangle.width, newRectangle.height, null, 0, newRectangle.width));
 
-						for (Rectangle otherRect : rectList) {
-							if (newRect.intersects(otherRect)) {
-								skip = true;
+						// update rabbit location
+						if (c.getCount() > 350) {
+							m_rabbit = newRectangle;
+							continue nextPixel;
+						}
+						
+						// skip overlapping rectangles
+						for (Rectangle otherRect : features) {
+							if (newRectangle.intersects(otherRect)) {
+								continue nextPixel;
 							}
 						}
 
-						if (!skip && newRect.width > 10 && newRect.height > 10) {
-							rectList.add(newRect);
-						}
+						// add this feature to the list of rectangles
+						features.add(newRectangle);
 					}
-
 				}
 			}
 		}
 
-		return rectList;
+		return features;
 
 	}
 
-	private Rectangle expandRect(int row, int col) {
+	private Rectangle expandRectangle(int row, int col) {
 
 		Rectangle r = new Rectangle(col, row, 1, 1);
 
