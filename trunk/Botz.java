@@ -139,6 +139,7 @@ public class Botz {
 	private Point findNearest(List<SpatialRect> list, Point rabbitLocation) {
 		Point p = new Point();
 
+		
 		if (rabbitLocation != null) {
 			Double distancesq = Double.MAX_VALUE;
 
@@ -150,25 +151,21 @@ public class Botz {
 									.getCenterY());
 					
 					
-					if (d < distancesq &&
-						r.getCenterY() - rabbitLocation.y < 160 &&
-						rabbitLocation.y < r.getCenterY()) 
+					if (d < distancesq && r.getCenterY() - rabbitLocation.y > 50 &&
+							rabbitLocation.y < r.getCenterY()) 
 					{
-					
-						
-						if (r.getCenterY() > p.y)
-						{
+
 							distancesq = d;
 							p.setLocation(r.getCenterX(), r.getCenterY());
-						}
+					
 
 					}
 			}
 		}
-		}
+	}
 	
 		
-	/*	if (list.size() > 2)
+		/*if (list.size() > 2 && rabbitLocation != null)
 		{
 			Collections.sort(list, new SpatialCompare ());
 		
@@ -181,7 +178,13 @@ public class Botz {
 			
 		
 		}*/
+		Graphics2D g2d = (Graphics2D)m_currentImage.getGraphics();
+		g2d.setColor(Color.MAGENTA);
 		
+		if (p != null & rabbitLocation != null)
+		{
+			g2d.drawLine(p.x, p.y, rabbitLocation.x, rabbitLocation.y);
+		}
 		return p;
 
 		// Point center = new Point (r.)
@@ -192,8 +195,8 @@ public class Botz {
 
 		List<SpatialRect> rectList = new ArrayList<SpatialRect>();
 
-		for (int x = 0; x < m_currentImage.getWidth() - 1; x++) {
-			for (int y = 0; y < m_currentImage.getHeight() - 1; y++) {
+		for (int x = 0; x < m_currentImage.getWidth() - 1; x+= 9) {
+			for (int y = 0; y < m_currentImage.getHeight() - 1; y+= 9) {
 
 				if (isWhite(m_currentImage.getRGB(x, y))) {
 					// check if pixel is inside a previous rectangle
