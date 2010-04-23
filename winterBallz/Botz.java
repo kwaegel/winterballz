@@ -10,11 +10,10 @@ import java.awt.Robot;
 import java.awt.geom.Point2D;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 public class Botz {
 	
@@ -24,7 +23,7 @@ public class Botz {
 	private BufferedImage m_currentImage;
 	private Rectangle m_gameArea;
 	private DrawPanel m_drawPanel;
-	private boolean m_allowMove = false;
+	private boolean m_allowMove = true;
 	private Rectangle m_rabbit;
 	private Robot m_robot;
 	
@@ -82,7 +81,7 @@ public class Botz {
 		// get current screen to draw prediction lines on
 		Graphics2D g2d = (Graphics2D) m_currentImage.getGraphics();
 		
-		Point closestBell = this.findNearest(rectList, m_rabbit.getLocation());	
+		Point closestBell = this.findNearest(rectList, m_rabbit);
 		
 		Point move = null;
 		
@@ -95,7 +94,32 @@ public class Botz {
 			g2d.drawLine(closestBell.x, closestBell.y, m_rabbit.x, m_rabbit.y);
 		}
 		
+		
+		
+		TreeMap<Integer, Rectangle> sortedFeatures = getFeaturesByDistance(rectList, m_rabbit);
+		
+		Set<Integer> keySet = sortedFeatures.keySet();
+		
+		
+		
+		
 		return move;
+	}
+	
+	private TreeMap<Integer, Rectangle> getFeaturesByDistance (List<Rectangle> rectList, Rectangle feature)
+	{
+		TreeMap<Integer, Rectangle> tm = new TreeMap<Integer, Rectangle>();
+		
+		int distance;
+		for (Rectangle r : rectList)
+		{
+			distance = (int) Point2D.distance(r.getCenterX(), r.getCenterY(), feature.getCenterX(), feature.getCenterY());
+			
+			tm.put(distance, r);
+			//tm.put(-r.y, r);
+		}
+		
+		return tm;
 	}
 	
 	public static int getSquaredDistance (Point p1, Point p2)
@@ -125,7 +149,7 @@ public class Botz {
 
 	}
 
-	private Point findNearest(List<Rectangle> list, Point rabbitLocation) {
+	private Point findNearest(List<Rectangle> list, Rectangle rabbit) {
 
 		Rectangle closestFeature = null;
 		if (list.size() > 2) {
@@ -133,7 +157,7 @@ public class Botz {
 			int closest = Integer.MAX_VALUE;
 			
 			for (Rectangle r : list) {
-				int distance = (int) Point2D.distance(r.getCenterX(), r.getCenterY(), m_rabbit.getCenterX(), m_rabbit.getCenterY());
+				int distance = (int) (rabbit.getCenterY() - r.getCenterY());// (int) Point2D.distance(r.getCenterX(), r.getCenterY(), rabbit.getCenterX(), rabbit.getCenterY());
 				
 				if (distance < closest){
 					closest = distance;
@@ -151,6 +175,9 @@ public class Botz {
 		
 		// reset rabbit each frame
 		m_rabbit = null;
+		
+		//TODO divide the image into four segments and search each quadrant with a separate thread
+		//pixelExpanders = Executors.newFixedThreadPool(4);
 		
 		List<Rectangle> features = new ArrayList<Rectangle>();
 
