@@ -2,7 +2,7 @@ package winterBallz;
 
 import java.awt.BorderLayout;
 import java.awt.Dimension;
-import java.awt.Point;
+import java.awt.Rectangle;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
@@ -25,8 +25,7 @@ public class Windowz extends JFrame implements KeyListener {
 	private DrawPanel m_drawPanel;
 	private JButton m_calibrateButton;
 	private JButton m_beginButton;
-	private Dimension m_gameDimension;
-	private Point m_location;
+	private Rectangle m_gameArea;
 	
 	public Windowz ()
 	{
@@ -96,9 +95,6 @@ public class Windowz extends JFrame implements KeyListener {
 				};
 
 				new Thread (r).start ();
-				
-				
-				
 			}
 			
 		});
@@ -107,13 +103,11 @@ public class Windowz extends JFrame implements KeyListener {
 	
 	private void startRobot ()
 	{
-		Botz bot = new Botz (m_gameDimension, m_location);
-		bot.setPanel(m_drawPanel);
+		Botz bot = new Botz (m_gameArea, m_drawPanel);
 		
 		while (true)
 		{
 			bot.update();
-			//bot.delay(550);
 		}
 	}
 	
@@ -155,10 +149,9 @@ public class Windowz extends JFrame implements KeyListener {
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				
-				m_gameDimension = m_sizeFrame.getSize();
-				m_location = m_sizeFrame.getLocationOnScreen();
+				m_gameArea = m_sizeFrame.getBounds();
 				m_sizeFrame.setVisible(false);
-				//System.out.println(m_gameDimension);
+				//System.out.println(m_gameArea);
 			}
 			
 		});
@@ -173,7 +166,6 @@ public class Windowz extends JFrame implements KeyListener {
 
 	@Override
 	public void keyPressed(KeyEvent e) {
-		// TODO Auto-generated method stub
 		
 		if (e.getKeyCode() == KeyEvent.VK_ESCAPE)
 		{
