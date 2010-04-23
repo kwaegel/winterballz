@@ -1,4 +1,4 @@
-
+package winterBallz;
 
 
 public class SpatialCompare implements java.util.Comparator<SpatialRect> {
