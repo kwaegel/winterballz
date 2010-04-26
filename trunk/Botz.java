@@ -158,6 +158,7 @@ public class Botz {
 		Point move = findNearest(recs, rabbitLoc);
 
 		if (move.x + move.y != 0) {
+		
 			move.x += m_gameLocation.x;
 			move.y += m_gameLocation.y;
 			System.out.println("Moving " + move);
@@ -171,6 +172,30 @@ public class Botz {
 		}
 
 	}
+	
+	
+	private SpatialRect findLowest (List<SpatialRect> list)
+	{
+		
+		Double greatest = Double.MIN_VALUE;
+		SpatialRect lowest = null;
+		
+		for (SpatialRect s: list)
+		{
+			
+			if (s.getCenterY() > greatest)
+			{
+				greatest = s.getCenterY();
+				lowest = s;
+			}
+			
+		}
+		
+		return lowest;
+		
+		
+		
+	}
 
 	private Point findNearest(List<SpatialRect> list, Point rabbitLocation) {
 		Point p = new Point();
@@ -180,8 +205,10 @@ public class Botz {
 			Double distancesq = Double.MAX_VALUE;
 
 			
-			Rectangle zone = new Rectangle (0, rabbitLocation.y - 100, m_currentImage.getWidth() - 1, 200);
+			Rectangle zone = new Rectangle (0, rabbitLocation.y - 100, m_currentImage.getWidth() - 1, 240);
 			//Rectangle vzone = new Rectangle (rabbitLocation.x - 100, 0, rabbitLocation.x + 200, m_currentImage.getHeight() - 1);
+			
+			g2d.draw(zone);
 			
 			List<SpatialRect> myList = new ArrayList<SpatialRect> ();
 			
@@ -190,12 +217,39 @@ public class Botz {
 				if (s.getType() != SpatialRect.Type.RABBIT && (s.intersects(zone) || zone.contains(s)))
 				{
 					s.setColor(Color.CYAN);
-					//s.draw(g2d);
 					myList.add(s);
 				}
 			}
 			
-			Rectangle special = new Rectangle (rabbit.x - 35, rabbit.y + 5, rabbit.width + 55, rabbit.height + 10);
+			SpatialRect lowest = findLowest(myList);
+			
+			if (lowest != null)
+			{
+				lowest.setColor(Color.ORANGE);
+				
+				double xdistance = Math.abs(rabbitLocation.x - lowest.getCenterX());
+				
+				if (xdistance > 200)
+				{
+					System.out.println("MADE IT HERE");
+					if (lowest.getCenterX() > rabbitLocation.x)
+					{
+						p.setLocation(m_currentImage.getWidth() - 50, lowest.getCenterY());
+					}
+					else
+					{
+						p.setLocation(10, lowest.getCenterY());
+					}
+				}
+				else
+				{
+					p.setLocation(lowest.getCenterX(),lowest.getCenterY());
+				}
+				
+				
+			}
+			/*
+			Rectangle special = new Rectangle (rabbit.x - 10, rabbit.y + 5, rabbit.width + 20, rabbit.height + 10);
 			
 			g2d.draw(special);
 		
@@ -220,39 +274,37 @@ public class Botz {
 					{
 					
 						distancesq = d;
-						p.setLocation(s.getCenterX(),s.getCenterY());
-					}
+						
+						double xdistance = Math.abs(rabbitLocation.x - s.getCenterX());
+						
+						if (xdistance > 200)
+						{
+							System.out.println("MADE IT HERE");
+							if (s.getCenterX() > rabbitLocation.x)
+							{
+								p.setLocation(s.getCenterX() + 150, s.getCenterY());
+							}
+							else
+							{
+								p.setLocation(s.getCenterX() - 150, s.getCenterY());
+							}
+						}
+						else
+						{
+							p.setLocation(s.getCenterX(),s.getCenterY());
+						}
+					}*/
 		
-				
+		
 			}
 			
-		if (p.x + p.y == 0)
-		{
-			distancesq = Double.MIN_VALUE;
-			for (SpatialRect s : myList)
-			{
-									
-					double d = (s.y);
-		
-				
-	
-				  if (d > distancesq)
-					{
-					
-						distancesq = d;
-						p.setLocation(s.getCenterX(),s.getCenterY());
-					}
-
-		
-				
-			}
-			
-		}
 	
 		
+	
+	/*	
 		g2d.drawString(distancesq.toString(), 400, 80);
 		g2d.setColor(Color.MAGENTA);
-		g2d.draw(zone);
+		
 		//g2d.draw(vzone);
 		
 		if (p != null & rabbitLocation != null)
@@ -260,8 +312,9 @@ public class Botz {
 			g2d.drawLine(p.x, p.y, rabbitLocation.x, rabbitLocation.y);
 		}
 		}
-		return p;
+		return p;*/
 
+		return p;
 	
 
 	}
