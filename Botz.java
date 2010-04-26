@@ -272,16 +272,16 @@ public class Botz {
 				
 				double xdistance = Math.abs(rabbitLocation.x - lowest.getCenterX());
 				
-				if (xdistance > 150)
+				if (xdistance > 125)
 				{
 					//System.out.println("MADE IT HERE");
 					if (lowest.getCenterX() > rabbitLocation.x)
 					{
-						p.setLocation(m_currentImage.getWidth() - 15, lowest.getCenterY());
+						p.setLocation(m_currentImage.getWidth() - 3, lowest.getCenterY());
 					}
 					else
 					{
-						p.setLocation(15, lowest.getCenterY());
+						p.setLocation(3, lowest.getCenterY());
 					}
 				}
 				else
