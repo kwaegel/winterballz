@@ -144,7 +144,7 @@ public class Windowz extends JFrame implements KeyListener {
 		
 		
 		m_sizeFrame = new JFrame ("SIZE ME CORRECTLY !");
-		m_sizeFrame.setSize(500, 500);
+		m_sizeFrame.setSize(750, 500);
 		
 		JPanel bPanel = new JPanel ();
 		
