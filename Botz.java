@@ -117,7 +117,12 @@ public class Botz {
 				deltay = rabbitLoc.y - prevRabbit.y;
 				prevRabbit = rabbitLoc;
 				
-				
+			}
+			
+			if (r.getWidth() > 22 && r.getWidth() < 25 && r.getHeight() > 17 && r.getHeight() < 22)
+			{
+				r.setType(SpatialRect.Type.BIRD);
+				r.setColor(Color.GREEN);
 			}
 
 			// switch color based on estimated object type
@@ -126,13 +131,7 @@ public class Botz {
 				r.setColor(Color.YELLOW);
 				rabbit = r;
 
-			} else if (r.width > 10) {
-				r.setColor(Color.RED);
-				
-			} else {
-				g2d.setColor(Color.GREEN);
-				g2d.drawRect(r.x, r.y, r.width, r.height);
-			}
+			} 
 			
 			g2d.setColor(Color.WHITE);
 		}
@@ -184,7 +183,7 @@ public class Botz {
 		
 		for (SpatialRect s: list)
 		{
-			
+		
 			if (s.getCenterY() > greatest)
 			{
 				greatest = s.getCenterY();
@@ -199,55 +198,18 @@ public class Botz {
 		
 	}
 	
-	
-	private SpatialRect findSecondLowest (List<SpatialRect> list, Point RabbitLocation)
-	{
-		if (oldLoc == Double.MAX_VALUE)
-			oldLoc = RabbitLocation.x;
-		if (list.size() > 1)
-		{
-			Collections.sort(list, new SpatialCompare ());
-			if (Math.abs(list.get(0).x - RabbitLocation.x) > Math.abs(list.get(1).x - RabbitLocation.x))
-			{
-				
-				if (Math.abs(oldLoc - list.get(1).x) < 5)
-				{
-					oldLoc = list.get(1).getCenterX();
-					return list.get(1);
-				}
-				else
-				{
-					oldLoc = list.get(0).getCenterX();
-					return list.get(0);
-				}
-			}
-			else
-			{
-				if (Math.abs(oldLoc - list.get(0).x) < 5)
-				{
-					oldLoc = list.get(0).getCenterX();
-					return list.get(0);
-				}
-				else
-				{
-					oldLoc = list.get(1).getCenterX();
-					return list.get(1);
-				}
-			}
-		}
-		return null;
-	}
+
 
 	private Point findNearest(List<SpatialRect> list, Point rabbitLocation) {
 		Point p = new Point();
 		Graphics2D g2d = (Graphics2D)m_currentImage.getGraphics();
 		
 		if (rabbitLocation != null) {
-			//Double distancesq = Double.MAX_VALUE;
+			
 
 			
 			Rectangle zone = new Rectangle (0, rabbitLocation.y - 100, m_currentImage.getWidth() - 1, 240);
-			//Rectangle vzone = new Rectangle (rabbitLocation.x - 100, 0, rabbitLocation.x + 200, m_currentImage.getHeight() - 1);
+			
 			
 			g2d.draw(zone);
 			
@@ -257,14 +219,17 @@ public class Botz {
 			{
 				if (s.getType() != SpatialRect.Type.RABBIT && (s.intersects(zone) || zone.contains(s)))
 				{
-					s.setColor(Color.CYAN);
-					myList.add(s);
+					if (s.getType() != SpatialRect.Type.BIRD)
+					{
+						s.setColor(Color.CYAN);
+					}
+						myList.add(s);
 				}
 			}
 			
 			SpatialRect lowest = findLowest(myList);
 			
-			//SpatialRect lowest = findSecondLowest(myList, rabbitLocation);
+			
 			
 			if (lowest != null)
 			{
@@ -272,16 +237,16 @@ public class Botz {
 				
 				double xdistance = Math.abs(rabbitLocation.x - lowest.getCenterX());
 				
-				if (xdistance > 125)
+				if (xdistance > 138)
 				{
 					//System.out.println("MADE IT HERE");
 					if (lowest.getCenterX() > rabbitLocation.x)
 					{
-						p.setLocation(m_currentImage.getWidth() - 3, lowest.getCenterY());
+						p.setLocation(m_currentImage.getWidth() - 4, lowest.getCenterY());
 					}
 					else
 					{
-						p.setLocation(3, lowest.getCenterY());
+						p.setLocation(4, lowest.getCenterY());
 					}
 				}
 				else
