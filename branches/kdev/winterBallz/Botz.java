@@ -2,10 +2,12 @@ package winterBallz;
 
 import java.awt.AWTException;
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.MouseInfo;
 import java.awt.Point;
 import java.awt.Rectangle;
+import java.awt.RenderingHints;
 import java.awt.Robot;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
@@ -21,10 +23,12 @@ public class Botz {
 	public static final int horzRes = 7;
 
 	private BufferedImage m_currentImage;
+	private BufferedImage m_scaledImage;
 	private Rectangle m_gameArea;
 	private DrawPanel m_drawPanel;
 	private boolean m_allowMove = true;
 	private Rectangle m_rabbit;
+	private Rectangle m_closestFeature;
 	private Point m_target;
 	private Robot m_robot;
 	
@@ -56,11 +60,11 @@ public class Botz {
 		// extract a list of features from the image
 		List<Rectangle> rectList = extractFeatures(m_currentImage);
 		
-		// draw the rectangles on the image and make a move
-		drawFeatures(rectList);
-		
 		// calculate the best move for the rabbit to make
 		Point move = getMove(rectList);
+		
+		// draw the rectangles on the image and make a move
+		drawFeatures(rectList);
 		
 		// make the move
 		if(m_allowMove && move != null)
@@ -68,70 +72,105 @@ public class Botz {
 		
 
 		// put the filtered image in the panel and draw
-		m_drawPanel.setImage(m_currentImage);
-		m_drawPanel.paintImmediately(0, 0, m_currentImage.getWidth(), m_currentImage.getHeight());
+		
+		// scale the image to fit the draw panel size
+		Dimension drawSize = m_drawPanel.getSize();
+		int width = m_currentImage.getWidth();
+		int height = m_currentImage.getHeight();
+		double aspectRatio = (double)width / (double)height;
+		int newWidth = drawSize.width;
+		int newHeight = (int)(newWidth / aspectRatio);
+		
+		
+		// Create new (blank) image of required (scaled) size
+		m_scaledImage = new BufferedImage(drawSize.width, drawSize.height, BufferedImage.TYPE_INT_RGB);
+
+		// Paint scaled version of image to new image
+		Graphics2D graphics2D = m_scaledImage.createGraphics();
+		graphics2D.setRenderingHint(RenderingHints.KEY_INTERPOLATION,RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+		graphics2D.drawImage(m_currentImage, 0, 0, newWidth, newHeight, null);
+
+		// clean up
+		graphics2D.dispose();
+		
+		m_drawPanel.setImage(m_scaledImage);
+		
+		// draw the screen immediately
+		m_drawPanel.paintImmediately(0, 0, m_scaledImage.getWidth(), m_scaledImage.getHeight());
 
 	}
 
+	/**
+	 * Create a point the mouse should move to in order to make the rabbit
+	 * hit the (hopefully) best bell.
+	 * @param rectList - a list of rectangles representing game features
+	 * @return - a point to move the mouse to in screen coordinates
+	 */
 	private Point getMove(List<Rectangle> rectList) {
 		
-		// we can't get a move if we don't know where the rabbit is...
+		// we can't calculate a move if we don't know where the rabbit is...
 		if (m_rabbit == null)
 			return null;
 		
-		// TODO change m_target to a rectangle to make sure it intersects the last rectangle position?
-		
-		// check if our target bell is still on the screen
-		Point move = null;
+		// check if our target is still on the screen
 		if (m_target != null)
 		{
-			// check to see if target is still pointing to a rectangle
+			// check to see if target is still inside a rectangle 
+			// (Probably the same feature from the last frame)
 			boolean targetMissing = true;
 			for (Rectangle r : rectList){
+				
 				if (r.contains(m_target)){
 					targetMissing = false;
+					
+					// if the target point is inside a rectangle, it is assumed to be
+					// the former target
 					m_target.x = (int) r.getCenterX();
 					m_target.y = (int) r.getCenterY();
 				}
 			}
 			
-			if (targetMissing)
+			// if the target was not found, set to null
+			if (targetMissing) {
+				m_target = null;
+			}
+		} else {
+			// find a new target feature
+			
+			// find the nearest feature to the rabbit
+			m_closestFeature = this.findNearest(rectList, m_rabbit);
+			
+			if (m_closestFeature != null)
+				m_target = getCenter(m_closestFeature);
+			else
 				m_target = null;
 		}
-		else
-		{
-			// get a new target
-			
-			// get current screen to draw prediction lines on
-			Graphics2D g2d = (Graphics2D) m_currentImage.getGraphics();
-			
-			Point closestBell = this.findNearest(rectList, m_rabbit);
-			
-			if (closestBell != null)
-				move = new Point(closestBell.x + m_gameArea.x, closestBell.y + m_gameArea.y);
-			
-			if (move != null)
-			{
-				g2d.setColor(Color.magenta);
-				g2d.drawLine(closestBell.x, closestBell.y, m_rabbit.x, m_rabbit.y);
-			}
-			
-			m_target = closestBell;
-		}
 		
-		
+		// return a new move if we have a target
 		if (m_target != null)
-			return new Point(m_target.x + m_gameArea.x, m_target.y + m_gameArea.y);
+			return new Point(m_target.x + m_gameArea.x, m_target.y + m_gameArea.y);// return position in image + game screen offset
 		else
 			return null;
 	}
 	
+	public static Point getCenter (Rectangle rect)
+	{
+		return new Point((int)rect.getCenterX(), (int)rect.getCenterY());
+	}
 	
 	public static int getSquaredDistance (Point p1, Point p2)
 	{
 		return (p1.x - p2.x)*(p1.x - p2.x) + (p1.y - p2.y)*(p1.y - p2.y);
 	}
 
+	/**
+	 * Draw:
+	 * -> a red box around every game feature
+	 * -> a yellow box around the rabbit
+	 * -> a magenta line from the rabbit to the nearest game feature
+	 * -> a cyan circle on the current target game feature
+	 * @param recs
+	 */
 	private void drawFeatures(List<Rectangle> recs) {
 
 		
@@ -147,19 +186,29 @@ public class Botz {
 			}
 		}
 
+		// if we know where the rabbit is, highlight it.
 		if (m_rabbit != null){
 			g2d.setColor(Color.yellow);
 			g2d.drawRect(m_rabbit.x, m_rabbit.y, m_rabbit.width, m_rabbit.height);
 		}
 		
+		// draw a circle at the current target
 		if (m_target != null) {
 			g2d.setColor(Color.cyan);
-			g2d.fillOval(m_target.x, m_target.y, 10, 10);
+			g2d.fillOval(m_target.x-5, m_target.y-5, 10, 10);
+		}
+		
+		// draw a line from the rabbit to the closest feature
+		if (m_closestFeature != null && m_rabbit != null)
+		{
+			// draw a line to the closest bell
+			g2d.setColor(Color.magenta);
+			g2d.drawLine((int)m_closestFeature.getCenterX(), (int)m_closestFeature.getCenterY(), m_rabbit.x, m_rabbit.y);
 		}
 
 	}
 
-	private Point findNearest(List<Rectangle> list, Rectangle rabbit) {
+	private Rectangle findNearest(List<Rectangle> list, Rectangle rabbit) {
 
 		Rectangle closestFeature = null;
 		if (list.size() > 2) {
@@ -167,9 +216,14 @@ public class Botz {
 			int closest = Integer.MAX_VALUE;
 			
 			for (Rectangle r : list) {
-				//int distance (int) Point2D.distance(r.getCenterX(), r.getCenterY(), rabbit.getCenterX(), rabbit.getCenterY());
-				int distance = (int) (rabbit.getCenterY() - r.getCenterY());
+				int distance =(int) Point.distance(r.getCenterX(), r.getCenterY(), rabbit.getCenterX(), rabbit.getCenterY());
+				//int distance = (int) (rabbit.getCenterY() - r.getCenterY());
 				
+//				if (r.y < rabbit.getCenterY())
+//					continue;
+				
+//				if (r.y > m_currentImage.getHeight() - 50)
+//					continue;
 				
 				if (distance < closest){
 					closest = distance;
@@ -180,7 +234,7 @@ public class Botz {
 		
 		if (closestFeature == null)
 			return null;
-		return closestFeature.getLocation();
+		return closestFeature;
 	}
 
 	private List<Rectangle> extractFeatures(BufferedImage image) {
@@ -210,32 +264,26 @@ public class Botz {
 		for (Future<Pair<List<Rectangle>, Rectangle>> ar : asyncResults)
 		{	
 			try {
-			Pair<List<Rectangle>, Rectangle> results = ar.get();
-			features.addAll( results.first );
-			
-			// check if this thread found the rabbit
-			if (results.second != null)
-				m_rabbit = results.second;
-			
+				Pair<List<Rectangle>, Rectangle> results = ar.get();
+				features.addAll( results.first );
+				
+				// check if this thread found the rabbit
+				if (results.second != null)
+					m_rabbit = results.second;
+				
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			} catch (ExecutionException e) {
 				e.printStackTrace();
 			}
 		}
-		
-		
-		
-		
-		
-		// ensure all the threads are finished.
-		//rectangleExtractors.shutdown();
 
 		return features;
 
 	}
 	
 	// divide up the image vertically
+	@SuppressWarnings("unused")
 	private List<Rectangle> divideImage(BufferedImage image, int sections) {
 		
 		List<Rectangle> list = new ArrayList<Rectangle>();
