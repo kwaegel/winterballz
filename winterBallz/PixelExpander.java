@@ -83,24 +83,24 @@ public class PixelExpander implements Runnable {
 		while (bA[0] || bA[1] || bA[2] || bA[3]) {
 			// grow up
 			if (bA[0]) {
-				r.y -= 1;
-				r.height++;
+				r.y -= 2;
+				r.height += 2;
 			}
 
 			// grow right
 			if (bA[1]) {
-				r.width++;
+				r.width+=2;
 			}
 
 			// grow down
 			if (bA[2]) {
-				r.height++;
+				r.height+=2;
 			}
 
 			// grow left
 			if (bA[3]) {
-				r.x -= 1;
-				r.width++;
+				r.x -= 2;
+				r.width+=2;
 			}
 
 			// check around the borders again

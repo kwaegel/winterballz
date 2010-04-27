@@ -27,7 +27,7 @@ public class Botz {
 	public static final int horzRes = 7;
 	public static final int maxLookahead = 3;
 	
-	private boolean m_allowMove = false;
+	private boolean m_allowMove = true;
 
 	private BufferedImage m_currentImage;
 	private BufferedImage m_scaledImage;
@@ -38,7 +38,9 @@ public class Botz {
 	private Rectangle m_rabbitRectangle;
 	private Point m_rabbitLoc;
 	private List<Point> m_featureLocations;
-	private List<Point> m_targetList;
+	private Point m_currentTarget;
+	private Rectangle m_targetZone = new Rectangle (0, 0, 0, 240);
+	//private List<Point> m_targetList;
 	
 	private ExecutorService rectangleExtractors;
 
@@ -46,7 +48,7 @@ public class Botz {
 		m_drawPanel = panel;
 		m_gameArea = new Rectangle(bounds);
 		m_featureLocations = new ArrayList<Point>();
-		m_targetList = new ArrayList<Point>();
+		//m_targetList = new ArrayList<Point>();
 
 		rectangleExtractors = Executors.newCachedThreadPool();
 
@@ -120,33 +122,15 @@ public class Botz {
 			g2d.fillOval(p.x - 8, p.y - 8, 16, 16);
 		}
 		
-		Point p1,p2;
-		// draw a line from the rabbit to the first target
-		if (m_rabbitLoc != null && m_targetList.size() > 0)
+		// draw the target zone
+		g2d.setColor(Color.white);
+		g2d.draw(m_targetZone);
+		
+		// draw a line to the target
+		if (m_currentTarget != null && m_rabbitLoc != null)
 		{
 			g2d.setColor(Color.green);
-			p1 = m_targetList.get(0);
-			if (p1 != null)
-				g2d.drawLine(p1.x, p1.y, m_rabbitLoc.x, m_rabbitLoc.y);
-			else
-				System.err.println("p1 was null.");
-			
-		}
-		
-		// draw lines between all the targets
-		if (m_targetList.size() >= 2)
-		{
-			g2d.setColor(Color.magenta);	
-			int rangeMax = m_targetList.size()-1;
-			for (int i=0; i < rangeMax; i++)
-			{
-				p1 = m_targetList.get(i);
-				p2 = m_targetList.get(i+1);
-				if (p1 == null || p2 == null)
-					System.out.println("null???");
-				else
-					g2d.drawLine(p1.x, p1.y, p2.x, p2.y);
-			}
+			g2d.drawLine(m_currentTarget.x, m_currentTarget.y, m_rabbitLoc.x, m_rabbitLoc.y);
 		}
 		
 
@@ -258,45 +242,72 @@ public class Botz {
 		}
 		
 		
-		// fill the target list with the closest bells, but only by adding new bells
-		if (m_targetList.size() < maxLookahead)
+		Rectangle targetZone = new Rectangle (0, m_rabbitLoc.y - 100, m_currentImage.getWidth() - 1, 240);
+		
+		this.m_targetZone.y = m_rabbitLoc.y - 100;
+		this.m_targetZone.width = m_currentImage.getWidth() - 1;
+		
+		m_currentTarget = getLowestFromZone(featureLocations, targetZone);
+		
+		Point mouseTarget = null;
+		
+		if (m_currentTarget != null)
 		{
-			Point startPosition;
-			if (m_targetList.size() <= 0)
-				startPosition = m_rabbitLoc;
-			else
-				startPosition = m_targetList.get(m_targetList.size()-1);
-			
-			if (startPosition != null)
+			mouseTarget = new Point(m_currentTarget);
+
+			double xdistance = Math.abs(m_rabbitLoc.x - m_currentTarget.x);
+
+			if (xdistance > 140)
 			{
-				Point nearestToEnd = getNearestVirtical(featureLocations, startPosition);
-				
-				m_targetList.add(nearestToEnd);
+				//System.out.println("MADE IT HERE");
+				if (m_currentTarget.x > m_rabbitLoc.x)
+				{
+					mouseTarget.setLocation(m_currentImage.getWidth() - 4, m_currentTarget.x);
+				}
+				else
+				{
+					mouseTarget.setLocation(4, m_currentTarget.y);
+				}
+			}
+			else
+			{
+				mouseTarget.setLocation(m_currentTarget.x,m_currentTarget.y);
 			}
 		}
 		
 		
 		
-		Point firstTarget;
-		try{
-			// the rabbit should be in position 0...
-			firstTarget = m_featureLocations.get(1);
-		}
-		catch (IndexOutOfBoundsException e)
-		{
-			firstTarget = null;
-		}
 		
 		// return a new move if we have a target
 		// TODO cange this to overshoot the bell for extra speed
-		if (firstTarget != null) {
+		if (mouseTarget != null) {
 			// position in image + game screen offset
-			return new Point(firstTarget.x + m_gameArea.x, firstTarget.y + m_gameArea.y);
+			return new Point(mouseTarget.x + m_gameArea.x, mouseTarget.y + m_gameArea.y);
 		} else {
+			// no move possible
 			return null;
 		}
 	}
 	
+
+	
+
+	private Point getLowestFromZone(List<Point> featureLocations, Rectangle targetZone) {
+		
+		double highestY = Double.MIN_VALUE;
+		Point lowestFeature = null;
+		for (Point feature : featureLocations)
+		{
+			if (feature.y > highestY && feature != m_rabbitLoc && targetZone.contains(feature))
+			{
+				highestY = feature.y;
+				lowestFeature = feature;
+			}
+		}
+		
+		
+		return lowestFeature;
+	}
 
 	private void movePlayer(Point move) {
 
@@ -371,7 +382,7 @@ public class Botz {
 				if (target == m_rabbitLoc)
 					m_rabbitLoc = null;
 				
-				m_targetList.remove(target);
+				//m_targetList.remove(target);
 				itr.remove();
 			}
 		}
