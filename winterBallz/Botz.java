@@ -19,7 +19,11 @@ public class Botz {
 	public static final int verticalRes = 10;
 	public static final int horzRes = 7;
 	public static final int maxLookahead = 3;
-	public static final int birdSpeedLimit = 3;
+	public static final int birdSpeedLimit = 2;
+	public static final float rabbitHorzontalSpeedMultiplier = 1.25f;
+	public static final float rabbitVerticalSpeedMultiplier = 0.0005f;
+	public static final int zoneLowerOffset = 100;
+	public static final int zoneHeight = 240;
 	
 	private boolean m_allowMove = true;
 
@@ -31,16 +35,17 @@ public class Botz {
 
 	// special rectangles
 	private Rectangle m_rabbitRectangle;
-	//private Rectangle m_birdRectangle;
+	private Rectangle m_birdRectangle;
 	
 	// special feature locations
-	private Point m_rabbitLoc;
-	private Point m_birdLoc;
+	private Point m_rabbitLocation;
+	private Point m_birdLocation;
+	private int m_birdDeltaX;
 	
 	
 	private List<Point> m_featureLocations;
 	private Point m_currentTarget;
-	private Rectangle m_targetZone = new Rectangle (0, 0, 0, 240);
+	private Rectangle m_targetZone = new Rectangle (0, 0, 0, zoneHeight);
 
 	public Botz(Rectangle bounds, DrawPanel panel) {
 		m_drawPanel = panel;
@@ -101,12 +106,18 @@ public class Botz {
 
 		Graphics2D g2d = (Graphics2D) m_currentImage.getGraphics();
 		
-		// draw circles about all the targets
+		for (Rectangle r : recs)
+		{
+			g2d.setColor(Color.red);
+			g2d.draw(r);
+		}
+		
+		// draw circles on all the targets
 		for (Point p : m_featureLocations)
 		{
-			if (p == m_rabbitLoc)
+			if (p == m_rabbitLocation)
 				g2d.setColor(Color.yellow);
-			else if (p == m_birdLoc)
+			else if (p == m_birdLocation)
 				g2d.setColor(Color.cyan);
 			else
 				g2d.setColor(Color.magenta);
@@ -118,10 +129,10 @@ public class Botz {
 		g2d.draw(m_targetZone);
 		
 		// draw a line to the target
-		if (m_currentTarget != null && m_rabbitLoc != null)
+		if (m_currentTarget != null && m_rabbitLocation != null)
 		{
 			g2d.setColor(Color.green);
-			g2d.drawLine(m_currentTarget.x, m_currentTarget.y, m_rabbitLoc.x, m_rabbitLoc.y);
+			g2d.drawLine(m_currentTarget.x, m_currentTarget.y, m_rabbitLocation.x, m_rabbitLocation.y);
 		}
 		
 
@@ -153,18 +164,34 @@ public class Botz {
 
 	}
 
-	private List<Rectangle> extractFeatures(BufferedImage m_image, Rectangle m_area) {
+	private List<Rectangle> extractFeatures(BufferedImage image, Rectangle bounds) {
+		
+		// Approximate sizes:
+		// bird:	26x14
+		// bell:	27x29
+		// rabbit:	46x25
 
 		// reset rabbit each frame
 		m_rabbitRectangle = null;
+		m_birdRectangle = null;
 		
 		List<Rectangle> features = new ArrayList<Rectangle>();
+		
+		
+		// find our maximum bounds
+		int minX = Math.max(0, bounds.x);
+		int minY = Math.max(0, bounds.y);
+		int maxX = Math.min(bounds.x + bounds.width, image.getWidth());
+		int maxY = Math.min(bounds.y + bounds.height, image.getHeight());
 
 		// check each pixel in the search area
-		for (int x = 0; x < m_area.x + m_area.width; x += Botz.horzRes) {
-			nextPixel: for (int y = 0; y < m_area.y + m_area.height; y += Botz.verticalRes) {
+		for (int x = minX; x < maxX; x += Botz.horzRes) {
+			nextPixel: for (int y = minY; y < maxY; y += Botz.verticalRes) {
 
-				if (isWhite(m_image.getRGB(x, y))) {
+				if (x > image.getWidth() || y > image.getHeight())
+					continue;
+				
+				if (isWhite(image.getRGB(x, y))) {
 
 					// skip pixel if it is inside a previous rectangle
 					for (Rectangle oldRect : features) {
@@ -175,16 +202,24 @@ public class Botz {
 
 					// SpatialRectangle newRect = new
 					// SpatialRectangle(expandRect(y, x));
-					Rectangle newRectangle = expandRectangle(y, x, m_image);
+					Rectangle newRectangle = expandRectangle(y, x, image);
 
 					// only add large rectangles
 					if (newRectangle.width > 10 && newRectangle.height > 10) {
-						Cell c = new Cell(m_image.getRGB(newRectangle.x, newRectangle.y, newRectangle.width,
-								newRectangle.height, null, 0, newRectangle.width));
+						Cell c = new Cell(image.getRGB(newRectangle.x, newRectangle.y, newRectangle.width, newRectangle.height, null, 0, newRectangle.width));
 
+						int blackPixelCount = c.getCount();
+						
 						// update rabbit location
-						if (c.getCount() > 350) {
+						if (blackPixelCount > 350) {
 							m_rabbitRectangle = newRectangle;
+							features.add(m_rabbitRectangle);
+							continue nextPixel;
+						}
+						else if (newRectangle.height < 20 && newRectangle.width > 25)
+						{
+							m_birdRectangle = newRectangle;
+							features.add(m_birdRectangle);
 							continue nextPixel;
 						}
 
@@ -207,9 +242,18 @@ public class Botz {
 		{
 			features.add(m_rabbitRectangle);
 			
-			// set the initial rabbit location if it is null
-			if (m_rabbitLoc == null)
-				m_rabbitLoc = getCenter(m_rabbitRectangle);
+			// update the rabbit location
+			if (m_rabbitRectangle == null)
+				m_rabbitLocation = getCenter(m_rabbitRectangle);
+		}
+		
+		if (m_birdRectangle != null)
+		{
+			features.add(m_birdRectangle);
+			
+			// update the rabbit location
+			if (m_birdLocation == null)
+				m_birdLocation = getCenter(m_birdRectangle);
 		}
 		
 		
@@ -219,9 +263,18 @@ public class Botz {
 
 
 	private void filterImage(BufferedImage image) {
+		
+		//int minX = Math.max(0, bounds.x);
+		//int minY = Math.max(0, bounds.y);
+		//int maxX = Math.min(bounds.x + bounds.width, image.getWidth());
+		//int maxY = Math.min(bounds.y + bounds.height, image.getHeight());
+		int minX = 0;
+		int minY = 0;
+		int maxX = image.getWidth();
+		int maxY = image.getHeight();
 
-		for (int x = 0; x < image.getWidth(); x++) {
-			for (int y = 0; y < image.getHeight(); y++) {
+		for (int x = minX; x < maxX; x++) {
+			for (int y = minY; y < maxY; y++) {
 				int rgb = image.getRGB(x, y);
 				int[] RGB = rgbToRGBArray(rgb);
 				if (image.getHeight() - y < 30 || RGB[0] < 200 || RGB[1] < 200 || RGB[2] < 200) {
@@ -245,14 +298,14 @@ public class Botz {
 	private Point getMove(List<Point> featureLocations) {
 
 		// we can't calculate where to move if we don't know where the rabbit is...?
-		if (m_rabbitLoc == null) {
+		if (m_rabbitLocation == null) {
 			return null;
 		}
 		
 		
-		Rectangle targetZone = new Rectangle (0, m_rabbitLoc.y - 100, m_currentImage.getWidth() - 1, 240);
+		Rectangle targetZone = new Rectangle (0, m_rabbitLocation.y - 100, m_currentImage.getWidth() - 1, 240);
 		
-		this.m_targetZone.y = m_rabbitLoc.y - 100;
+		this.m_targetZone.y = m_rabbitLocation.y - zoneLowerOffset;
 		this.m_targetZone.width = m_currentImage.getWidth() - 1;
 		
 		m_currentTarget = getLowestFromZone(featureLocations, targetZone);
@@ -262,32 +315,32 @@ public class Botz {
 		if (m_currentTarget != null)
 		{
 			mouseTarget = new Point(m_currentTarget);
+			
+			int xDistance = m_currentTarget.x - m_rabbitLocation.x;	// positive if target is to the right of the rabbit, negative if target is to the left
+			//int yDistance = m_currentTarget.y - m_rabbitLocation.y;	// positive if target is below the rabbit, negative if target is above
+			
+			// calculate the distance to overshoot
+			int minMouseX = 4;
+			int maxMouseX = m_currentImage.getWidth() - 4; 
 
-			double xdistance = Math.abs(m_rabbitLoc.x - m_currentTarget.x);
-
-			if (xdistance > 140)
+			// set the horizontal movement to be a multiple of the distance to the target
+			int desiredDeltaX = (int) (xDistance * rabbitHorzontalSpeedMultiplier);// + (int) (yDistance * rabbitVerticalSpeedMultiplier);
+			
+			// clamp the overshoot distance to the screen size
+			int desiredMouseX = desiredDeltaX + m_rabbitLocation.x;
+			
+			if (m_currentTarget == m_birdLocation)
 			{
-				//System.out.println("MADE IT HERE");
-				if (m_currentTarget.x > m_rabbitLoc.x)
-				{
-					mouseTarget.setLocation(m_currentImage.getWidth() - 4, m_currentTarget.x);
-				}
-				else
-				{
-					mouseTarget.setLocation(4, m_currentTarget.y);
-				}
+				desiredMouseX += m_birdDeltaX;
 			}
-			else
-			{
-				mouseTarget.setLocation(m_currentTarget.x,m_currentTarget.y);
-			}
+			
+			int actualMouseX = clamp(desiredMouseX, minMouseX, maxMouseX);
+			
+			mouseTarget.setLocation(actualMouseX, m_currentTarget.y);
 		}
 		
 		
-		
-		
 		// return a new move if we have a target
-		// TODO cange this to overshoot the bell for extra speed
 		if (mouseTarget != null) {
 			// position in image + game screen offset
 			return new Point(mouseTarget.x + m_gameArea.x, mouseTarget.y + m_gameArea.y);
@@ -304,7 +357,7 @@ public class Botz {
 		Point lowestFeature = null;
 		for (Point feature : featureLocations)
 		{
-			if (feature.y > highestY && feature != m_rabbitLoc && targetZone.contains(feature))
+			if (feature.y > highestY && feature != m_rabbitLocation && targetZone.contains(feature))
 			{
 				highestY = feature.y;
 				lowestFeature = feature;
@@ -332,13 +385,14 @@ public class Botz {
 
 		// capture the screen
 		m_currentImage = m_robot.createScreenCapture(m_gameArea);
+		
+		m_targetZone.width = m_currentImage.getWidth()-1;
 
 		// filter out extraneous image data
 		filterImage(m_currentImage);
 
 		// extract a list of features from the image
-		Rectangle bounds = new Rectangle(0,0,m_currentImage.getWidth(), m_currentImage.getHeight());
-		List<Rectangle> rectList = extractFeatures(m_currentImage, bounds);
+		List<Rectangle> rectList = extractFeatures(m_currentImage, m_targetZone);
 
 		updateFeatureLocations(rectList, m_featureLocations);
 
@@ -378,13 +432,20 @@ public class Botz {
 					int centerY = (int) rect.getCenterY();
 					
 					// check for special targets
-					int deltaX = target.x - centerX;
-					//int deltaY = target.y - centerY;
+					int deltaX = Math.abs(target.x - centerX);
 					
-					if (m_birdLoc == null && deltaX > birdSpeedLimit)
+					// store bird speed
+					if (target == m_birdLocation)
 					{
-						m_birdLoc = target;
+						m_birdDeltaX = target.x - m_birdLocation.x;
 					}
+					
+					if (m_birdLocation == null && deltaX > birdSpeedLimit)
+					{
+						m_birdLocation = target;
+					}
+					
+					
 					
 					// update target location
 					target.x = centerX;
@@ -399,10 +460,10 @@ public class Botz {
 			if (!targetUpdated) {
 				
 				// remove special features if they go missing
-				if (target == m_rabbitLoc)
-					m_rabbitLoc = null;
-				if (target == m_birdLoc)
-					m_birdLoc = null;
+				if (target == m_rabbitLocation)
+					m_rabbitLocation = null;
+				if (target == m_birdLocation)
+					m_birdLocation = null;
 				
 				//m_targetList.remove(target);
 				itr.remove();
@@ -429,7 +490,9 @@ public class Botz {
 				targets.add(newPoint);
 				
 				if (rect == m_rabbitRectangle)
-					m_rabbitLoc = newPoint;
+					m_rabbitLocation = newPoint;
+				if (rect == m_birdRectangle)
+					m_birdLocation = newPoint;
 			}
 		}
 
@@ -466,14 +529,18 @@ public class Botz {
 	
 	private static boolean[] checkBorders(Rectangle r, BufferedImage image) {
 		boolean[] bArray = new boolean[4];
+		
+		int maxX = image.getWidth();
+		int maxY = image.getHeight();
 
 		// check top
-
 		int row = r.y - 1;
 
 		if (row > 0) {
-			for (int c = r.x; c <= r.x + r.width; c++) {
-				if (isWhite(image.getRGB(c, row))) {
+			for (int col = r.x; col <= r.x + r.width; col++) {
+				if (col < 0 || col > maxX)
+					break;
+				if ( isWhite(image.getRGB(col, row))) {
 					bArray[0] = true;
 					break;
 				}
@@ -481,10 +548,11 @@ public class Botz {
 		}
 
 		// check right
-
 		int col = r.x + r.width + 1;
-		if (col < image.getWidth()) {
+		if (col < maxX) {
 			for (row = r.y; row <= r.y + r.height; row++) {
+				if (row < 0 || row > maxY)
+					break;
 				if (isWhite(image.getRGB(col, row))) {
 					bArray[1] = true;
 					break;
@@ -493,10 +561,11 @@ public class Botz {
 		}
 
 		// check bottom
-
 		row = r.y + r.height + 1;
-		if (row < image.getHeight()) {
+		if (row < maxY) {
 			for (int c = r.x; c <= r.x + r.width; c++) {
+				if (col < 0 || col > maxX)
+					break;
 				if (isWhite(image.getRGB(c, row))) {
 					bArray[2] = true;
 					break;
@@ -508,6 +577,8 @@ public class Botz {
 		col = r.x - 1;
 		if (col > 0) {
 			for (row = r.y; row <= r.y + r.height; row++) {
+				if (row < 0 || row > maxY)
+					break;
 				if (isWhite(image.getRGB(col, row))) {
 					bArray[3] = true;
 					break;
@@ -517,34 +588,53 @@ public class Botz {
 		return bArray;
 	}
 
+	/**
+	 * Clamps a value to within a specific range
+	 * @param value
+	 * @param min
+	 * @param max
+	 * @return
+	 */
+	private static int clamp(int value, int min, int max)
+	{
+		if (value < min)
+			return min;
+		else if (value > max)
+			return max;
+		else
+			return value;
+	}
 	
 	private static Rectangle expandRectangle(int row, int col, BufferedImage image) {
 
 		Rectangle r = new Rectangle(col, row, 1, 1);
 
 		boolean[] bA = checkBorders(r, image);
+		
+		int maxX = image.getWidth();
+		int maxY = image.getHeight();
 
 		// if there is a white pixel on any side of the rectangle, grow the
-		// rectangel in that direction
+		// rectangle in that direction
 		while (bA[0] || bA[1] || bA[2] || bA[3]) {
 			// grow up
-			if (bA[0]) {
+			if (bA[0] && r.y > 0) {
 				r.y -= 1;
 				r.height++;
 			}
 
 			// grow right
-			if (bA[1]) {
+			if (bA[1] && r.x + r.width < maxX) {
 				r.width++;
 			}
 
 			// grow down
-			if (bA[2]) {
+			if (bA[2] && r.y + r.height < maxY) {
 				r.height++;
 			}
 
 			// grow left
-			if (bA[3]) {
+			if (bA[3] && r.x > 0){
 				r.x -= 1;
 				r.width++;
 			}
