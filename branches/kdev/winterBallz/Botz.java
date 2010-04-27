@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Queue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -24,7 +25,7 @@ public class Botz {
 
 	public static final int verticalRes = 10;
 	public static final int horzRes = 7;
-	public static final int maxLookahead = 20;
+	public static final int maxLookahead = 3;
 	
 	private boolean m_allowMove = false;
 
@@ -32,20 +33,20 @@ public class Botz {
 	private BufferedImage m_scaledImage;
 	private Rectangle m_gameArea;
 	private DrawPanel m_drawPanel;
-
-	private Rectangle m_rabbit;
-	private Point m_rabbitLoc;
-	private Rectangle m_closestFeature;
-	//private Point m_currentTarget;
 	private Robot m_robot;
-	private List<Point> m_targets;
+
+	private Rectangle m_rabbitRectangle;
+	private Point m_rabbitLoc;
+	private List<Point> m_featureLocations;
+	private List<Point> m_targetList;
 	
 	private ExecutorService rectangleExtractors;
 
 	public Botz(Rectangle bounds, DrawPanel panel) {
 		m_drawPanel = panel;
 		m_gameArea = new Rectangle(bounds);
-		m_targets = new ArrayList<Point>();
+		m_featureLocations = new ArrayList<Point>();
+		m_targetList = new ArrayList<Point>();
 
 		rectangleExtractors = Executors.newCachedThreadPool();
 
@@ -103,24 +104,14 @@ public class Botz {
 
 		Graphics2D g2d = (Graphics2D) m_currentImage.getGraphics();
 
-//		for (Rectangle r : recs) {
-//			if (r.width > 10) {
-//				g2d.setColor(Color.RED);
-//				g2d.drawRect(r.x, r.y, r.width, r.height);
-//			} else {
-//				g2d.setColor(Color.GREEN);
-//				g2d.drawRect(r.x, r.y, r.width, r.height);
-//			}
-//		}
-
 		// if we know where the rabbit is, highlight it.
-		if (m_rabbit != null) {
+		if (m_rabbitRectangle != null) {
 			g2d.setColor(Color.yellow);
-			g2d.drawRect(m_rabbit.x, m_rabbit.y, m_rabbit.width, m_rabbit.height);
+			g2d.drawRect(m_rabbitRectangle.x, m_rabbitRectangle.y, m_rabbitRectangle.width, m_rabbitRectangle.height);
 		}
 		
 		// draw circles about all the targets
-		for (Point p : m_targets)
+		for (Point p : m_featureLocations)
 		{
 			if (p == m_rabbitLoc)
 				g2d.setColor(Color.yellow);
@@ -129,15 +120,33 @@ public class Botz {
 			g2d.fillOval(p.x - 8, p.y - 8, 16, 16);
 		}
 		
-		// draw lines between all the features
-		g2d.setColor(Color.magenta);
 		Point p1,p2;
-		int rangeMax = Math.min(maxLookahead, m_targets.size()-1);
-		for (int i=0; i < rangeMax;i++)
+		// draw a line from the rabbit to the first target
+		if (m_rabbitLoc != null && m_targetList.size() > 0)
 		{
-			p1 = m_targets.get(i);
-			p2 = m_targets.get(i+1);
-			g2d.drawLine(p1.x, p1.y, p2.x, p2.y);
+			g2d.setColor(Color.green);
+			p1 = m_targetList.get(0);
+			if (p1 != null)
+				g2d.drawLine(p1.x, p1.y, m_rabbitLoc.x, m_rabbitLoc.y);
+			else
+				System.err.println("p1 was null.");
+			
+		}
+		
+		// draw lines between all the targets
+		if (m_targetList.size() >= 2)
+		{
+			g2d.setColor(Color.magenta);	
+			int rangeMax = m_targetList.size()-1;
+			for (int i=0; i < rangeMax; i++)
+			{
+				p1 = m_targetList.get(i);
+				p2 = m_targetList.get(i+1);
+				if (p1 == null || p2 == null)
+					System.out.println("null???");
+				else
+					g2d.drawLine(p1.x, p1.y, p2.x, p2.y);
+			}
 		}
 		
 
@@ -172,7 +181,7 @@ public class Botz {
 	private List<Rectangle> extractFeatures(BufferedImage image) {
 
 		// reset rabbit each frame
-		m_rabbit = null;
+		m_rabbitRectangle = null;
 
 		List<Rectangle> features = new ArrayList<Rectangle>();
 
@@ -199,7 +208,7 @@ public class Botz {
 
 				// check if this thread found the rabbit
 				if (results.second != null) {
-					m_rabbit = results.second;
+					m_rabbitRectangle = results.second;
 				}
 
 			} catch (InterruptedException e) {
@@ -209,9 +218,9 @@ public class Botz {
 			}
 		}
 		
-		// the rabbit is not returned as part of the features list
-		if (m_rabbit != null)
-			features.add(m_rabbit);
+		// the rabbit is not returned as part of the features list, so add it here
+		if (m_rabbitRectangle != null)
+			features.add(m_rabbitRectangle);
 
 		return features;
 
@@ -241,40 +250,37 @@ public class Botz {
 	 *            - a list of rectangles representing game features
 	 * @return - a point to move the mouse to in screen coordinates
 	 */
-	private Point getMove(List<Rectangle> rectList, List<Point> targetPoints) {
+	private Point getMove(List<Point> featureLocations) {
 
-		// we can't calculate where to move if we don't know where the rabbit is...
+		// we can't calculate where to move if we don't know where the rabbit is...?
 		if (m_rabbitLoc == null) {
 			return null;
 		}
 		
-		// sort the targets list in the order they should be hit
-		// for now, that is which ones are closest to each other.
 		
-		// make sure the rabbit is the first in the list.
-		Collections.swap(targetPoints, targetPoints.indexOf(m_rabbitLoc), 0);
-		
-		Point nearest = null;
-		int nearestIndex;
-		int rangeMax = Math.min(maxLookahead, targetPoints.size()-1);
-		for (int i=2; i < rangeMax; i++)
+		// fill the target list with the closest bells, but only by adding new bells
+		if (m_targetList.size() < maxLookahead)
 		{
-			// find the nearest next point
-			nearest = getNearestPoint(targetPoints, targetPoints.get(i));
-			
-			// swap the nearest with the next in the list
-			nearestIndex = targetPoints.indexOf(nearest);
-			if (nearestIndex >= 0)
-				Collections.swap(targetPoints, nearestIndex, i+1);
+			Point startPosition;
+			if (m_targetList.size() <= 0)
+				startPosition = m_rabbitLoc;
 			else
+				startPosition = m_targetList.get(m_targetList.size()-1);
+			
+			if (startPosition != null)
 			{
-				System.err.println("Index was negative");
+				Point nearestToEnd = getNearestVirtical(featureLocations, startPosition);
+				
+				m_targetList.add(nearestToEnd);
 			}
 		}
 		
+		
+		
 		Point firstTarget;
 		try{
-			firstTarget = m_targets.get(1);
+			// the rabbit should be in position 0...
+			firstTarget = m_featureLocations.get(1);
 		}
 		catch (IndexOutOfBoundsException e)
 		{
@@ -282,19 +288,19 @@ public class Botz {
 		}
 		
 		// return a new move if we have a target
+		// TODO cange this to overshoot the bell for extra speed
 		if (firstTarget != null) {
 			// position in image + game screen offset
-			return new Point(firstTarget.x + m_gameArea.x, firstTarget.y + m_gameArea.y);// return
+			return new Point(firstTarget.x + m_gameArea.x, firstTarget.y + m_gameArea.y);
 		} else {
 			return null;
 		}
 	}
+	
 
 	private void movePlayer(Point move) {
 
 		if (move != null) {
-			// System.out.println(move);
-
 			// only move the mouse horizontally
 			Point mousePos = MouseInfo.getPointerInfo().getLocation();
 			m_robot.mouseMove(move.x, mousePos.y);
@@ -303,6 +309,7 @@ public class Botz {
 
 		return;
 	}
+	
 
 	public void update() {
 
@@ -315,10 +322,10 @@ public class Botz {
 		// extract a list of features from the image
 		List<Rectangle> rectList = extractFeatures(m_currentImage);
 
-		updateTargets(rectList, m_targets);
+		updateFeatureLocations(rectList, m_featureLocations);
 
 		// calculate the best move for the rabbit to make
-		Point move = getMove(rectList, m_targets);
+		Point move = getMove(m_featureLocations);
 
 		// draw the rectangles on the image and make a move
 		drawFeatures(rectList);
@@ -335,7 +342,7 @@ public class Botz {
 	 * @param featureList
 	 * @param targets
 	 */
-	private void updateTargets(List<Rectangle> featureList, List<Point> targets) {
+	private void updateFeatureLocations(List<Rectangle> featureList, List<Point> targets) {
 
 		// update all the target positions and remove targets without a feature behind them
 		boolean targetUpdated;
@@ -343,14 +350,14 @@ public class Botz {
 			
 			targetUpdated = false;
 			Point target = itr.next();
-			for (Rectangle feature : featureList) {
-				if (feature.contains(target)) {
+			for (Rectangle rect : featureList) {
+				if (rect.contains(target)) {
 					targetUpdated = true;
 
 					// if the target point is inside a rectangle, it is assumed
 					// to be the former target
-					target.x = (int) feature.getCenterX();
-					target.y = (int) feature.getCenterY();
+					target.x = (int) rect.getCenterX();
+					target.y = (int) rect.getCenterY();
 
 					// check the next target
 					break;
@@ -359,22 +366,25 @@ public class Botz {
 
 			// if an associated feature was not found, remove the target
 			if (!targetUpdated) {
-				// if rabbitLoc is about to be removed from the list, set it to null
+				
+				// if rabbitLoc is about to be removed from the list, also set that to null
 				if (target == m_rabbitLoc)
 					m_rabbitLoc = null;
+				
+				m_targetList.remove(target);
 				itr.remove();
 			}
 		}
 			
 
 		
-		// check for any features without a target point
+		// check for any rectangles without a target point
 		boolean targetPointMissing;
-		for (Rectangle feature : featureList) {
+		for (Rectangle rect : featureList) {
 			
 			targetPointMissing = true;
 			for (Point t : targets) {
-				if (feature.contains(t)) {
+				if (rect.contains(t)) {
 					targetPointMissing = false;
 					break;
 				}
@@ -382,10 +392,10 @@ public class Botz {
 
 			// if the feature does not have a target point associated with it
 			if (targetPointMissing) {
-				Point newPoint = getCenter(feature);
+				Point newPoint = getCenter(rect);
 				targets.add(newPoint);
 				
-				if (feature == m_rabbit)
+				if (rect == m_rabbitRectangle)
 					m_rabbitLoc = newPoint;
 			}
 		}
@@ -427,8 +437,10 @@ public class Botz {
 		}
 		return closestFeature;
 	}
+	
 
 	// return the point in list that is above and closest to the basePoint
+	@SuppressWarnings("unused")
 	private static Point getNearestPoint(List<Point> pointList, Point basePoint)
 	{
 		Point closestPoint = null;
@@ -449,6 +461,33 @@ public class Botz {
 		return closestPoint;
 	}
 	
+	/**
+	 * @param pointList
+	 * @param basePoint
+	 * @return the nearest point in pointList above basePoint on the screen
+	 */
+	private static Point getNearestVirtical(List<Point> pointList, Point basePoint)
+	{
+		Point closestPoint = null;
+		int closest = Integer.MAX_VALUE;
+
+		for (Point p : pointList) {
+			if (p != basePoint)
+			{
+				//int distance = basePoint.y - p.y;
+				int distance = (int) Point2D.distance(p.x, p.y, basePoint.x, basePoint.y);
+
+				if (distance < closest && p.y <= basePoint.y) {
+					closest = distance;
+					closestPoint = p;
+				}
+			}
+		}
+		
+		return closestPoint;
+	}
+
+
 	public static Point getCenter(Rectangle rect) {
 		return new Point((int) rect.getCenterX(), (int) rect.getCenterY());
 	}
