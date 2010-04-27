@@ -1,4 +1,5 @@
 package winterBallz;
+
 import java.awt.Color;
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
@@ -6,70 +7,68 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 
-
-
 public class FeatureExtractor implements Callable<Pair<List<Rectangle>, Rectangle>> {
-	
+
 	Rectangle m_area;
 	BufferedImage m_image;
-	
+
 	public FeatureExtractor(Rectangle searchArea, BufferedImage image) {
-		
+
 		m_area = searchArea;
 		m_image = image;
 	}
-	
+
 	public Pair<List<Rectangle>, Rectangle> call() throws Exception {
-		
+
 		List<Rectangle> features = new ArrayList<Rectangle>();
 		Rectangle rabbit = null;
-		
-		//check each pixel in the search area
+
+		// check each pixel in the search area
 		for (int x = 0; x < m_area.x + m_area.width; x += Botz.horzRes) {
-			nextPixel:
-				for (int y = 0; y < m_area.y + m_area.height; y += Botz.verticalRes) {
+			nextPixel: for (int y = 0; y < m_area.y + m_area.height; y += Botz.verticalRes) {
 
-					if (isWhite(m_image.getRGB(x, y))) {
+				if (isWhite(m_image.getRGB(x, y))) {
 
-						// skip pixel if it is inside a previous rectangle
-						for (Rectangle oldRect : features) {
-							if (oldRect.contains(x, y)) {
-								continue nextPixel;
-							}
-						}
-
-						//SpatialRectangle newRect = new SpatialRectangle(expandRect(y, x));
-						Rectangle newRectangle = expandRectangle(y, x, m_image);
-
-						// only add large rectangles
-						if (newRectangle.width > 10 && newRectangle.height > 10)
-						{
-							Cell c = new Cell(m_image.getRGB(newRectangle.x, newRectangle.y, newRectangle.width, newRectangle.height, null, 0, newRectangle.width));
-
-							// update rabbit location
-							if (c.getCount() > 350) {
-								rabbit = newRectangle;
-								continue nextPixel;
-							}
-
-							// skip overlapping rectangles
-							for (Rectangle otherRect : features) {
-								if (newRectangle.intersects(otherRect)) {
-									continue nextPixel;
-								}
-							}
-
-							// add this feature to the list of rectangles
-							features.add(newRectangle);
+					// skip pixel if it is inside a previous rectangle
+					for (Rectangle oldRect : features) {
+						if (oldRect.contains(x, y)) {
+							continue nextPixel;
 						}
 					}
+
+					// SpatialRectangle newRect = new
+					// SpatialRectangle(expandRect(y, x));
+					Rectangle newRectangle = expandRectangle(y, x, m_image);
+
+					// only add large rectangles
+					if (newRectangle.width > 10 && newRectangle.height > 10) {
+						Cell c = new Cell(m_image.getRGB(newRectangle.x, newRectangle.y, newRectangle.width,
+								newRectangle.height, null, 0, newRectangle.width));
+
+						// update rabbit location
+						if (c.getCount() > 350) {
+							rabbit = newRectangle;
+							continue nextPixel;
+						}
+
+						// skip overlapping rectangles
+						for (Rectangle otherRect : features) {
+							if (newRectangle.intersects(otherRect)) {
+								continue nextPixel;
+							}
+						}
+
+						// add this feature to the list of rectangles
+						features.add(newRectangle);
+					}
 				}
+			}
 		}
-		
+
 		return new Pair<List<Rectangle>, Rectangle>(features, rabbit);
 
 	}
-	
+
 	private boolean[] checkBorders(Rectangle r, BufferedImage image) {
 		boolean[] bArray = new boolean[4];
 
@@ -128,7 +127,8 @@ public class FeatureExtractor implements Callable<Pair<List<Rectangle>, Rectangl
 
 		boolean[] bA = checkBorders(r, image);
 
-		// if there is a white pixel on any side of the rectangle, grow the rectangel in that direction
+		// if there is a white pixel on any side of the rectangle, grow the
+		// rectangel in that direction
 		while (bA[0] || bA[1] || bA[2] || bA[3]) {
 			// grow up
 			if (bA[0]) {
@@ -159,7 +159,7 @@ public class FeatureExtractor implements Callable<Pair<List<Rectangle>, Rectangl
 		return r;
 
 	}
-	
+
 	public static boolean isWhite(int c) {
 		return (c == Color.WHITE.getRGB());
 	}
