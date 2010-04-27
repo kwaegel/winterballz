@@ -22,7 +22,7 @@ public class FeatureExtractor implements Callable<Pair<List<Rectangle>, Rectangl
 	public Pair<List<Rectangle>, Rectangle> call() throws Exception {
 		
 		List<Rectangle> features = new ArrayList<Rectangle>();
-		Rectangle m_rabbit = null;
+		Rectangle rabbit = null;
 		
 		//check each pixel in the search area
 		for (int x = 0; x < m_area.x + m_area.width; x += Botz.horzRes) {
@@ -48,7 +48,7 @@ public class FeatureExtractor implements Callable<Pair<List<Rectangle>, Rectangl
 
 							// update rabbit location
 							if (c.getCount() > 350) {
-								m_rabbit = newRectangle;
+								rabbit = newRectangle;
 								continue nextPixel;
 							}
 
@@ -66,7 +66,7 @@ public class FeatureExtractor implements Callable<Pair<List<Rectangle>, Rectangl
 				}
 		}
 		
-		return new Pair<List<Rectangle>, Rectangle>(features, m_rabbit);
+		return new Pair<List<Rectangle>, Rectangle>(features, rabbit);
 
 	}
 	

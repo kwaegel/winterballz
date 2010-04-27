@@ -119,8 +119,8 @@ public class Windowz extends JFrame implements KeyListener {
 		m_buttonPanel.add(m_calibrateButton);
 		m_buttonPanel.add(m_beginButton);
 		
-		this.add(m_buttonPanel, BorderLayout.CENTER);
-		this.add(m_drawPanel,BorderLayout.SOUTH);
+		this.add(m_buttonPanel, BorderLayout.NORTH);
+		this.add(m_drawPanel,BorderLayout.CENTER);
 		
 	}
 	
