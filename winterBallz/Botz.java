@@ -24,6 +24,7 @@ public class Botz {
 
 	public static final int verticalRes = 10;
 	public static final int horzRes = 7;
+	public static final int maxLookahead = 20;
 	
 	private boolean m_allowMove = false;
 
@@ -131,7 +132,8 @@ public class Botz {
 		// draw lines between all the features
 		g2d.setColor(Color.magenta);
 		Point p1,p2;
-		for (int i=0; i < m_targets.size()-1;i++)
+		int rangeMax = Math.min(maxLookahead, m_targets.size()-1);
+		for (int i=0; i < rangeMax;i++)
 		{
 			p1 = m_targets.get(i);
 			p2 = m_targets.get(i+1);
@@ -254,7 +256,8 @@ public class Botz {
 		
 		Point nearest = null;
 		int nearestIndex;
-		for (int i=0; i<targetPoints.size()-1; i++)
+		int rangeMax = Math.min(maxLookahead, targetPoints.size()-1);
+		for (int i=2; i < rangeMax; i++)
 		{
 			// find the nearest next point
 			nearest = getNearestPoint(targetPoints, targetPoints.get(i));
@@ -429,19 +432,16 @@ public class Botz {
 	private static Point getNearestPoint(List<Point> pointList, Point basePoint)
 	{
 		Point closestPoint = null;
-		if (pointList.size() > 2) {
+		int closest = Integer.MAX_VALUE;
 
-			int closest = Integer.MAX_VALUE;
+		for (Point p : pointList) {
+			if (p != basePoint)
+			{
+				int distance = (int) Point2D.distance(p.x, p.y, basePoint.x, basePoint.y);
 
-			for (Point p : pointList) {
-				if (p != basePoint)
-				{
-					int distance = (int) Point2D.distance(p.x, p.y, basePoint.x, basePoint.y);
-	
-					if (distance < closest) {
-						closest = distance;
-						closestPoint = p;
-					}
+				if (distance < closest) {
+					closest = distance;
+					closestPoint = p;
 				}
 			}
 		}
