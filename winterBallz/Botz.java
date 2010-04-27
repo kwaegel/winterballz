@@ -9,23 +9,17 @@ import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.Robot;
-import java.awt.geom.Point2D;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Queue;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 
 public class Botz {
 
 	public static final int verticalRes = 10;
 	public static final int horzRes = 7;
 	public static final int maxLookahead = 3;
+	public static final int birdSpeedLimit = 3;
 	
 	private boolean m_allowMove = true;
 
@@ -35,22 +29,23 @@ public class Botz {
 	private DrawPanel m_drawPanel;
 	private Robot m_robot;
 
+	// special rectangles
 	private Rectangle m_rabbitRectangle;
+	//private Rectangle m_birdRectangle;
+	
+	// special feature locations
 	private Point m_rabbitLoc;
+	private Point m_birdLoc;
+	
+	
 	private List<Point> m_featureLocations;
 	private Point m_currentTarget;
 	private Rectangle m_targetZone = new Rectangle (0, 0, 0, 240);
-	//private List<Point> m_targetList;
-	
-	private ExecutorService rectangleExtractors;
 
 	public Botz(Rectangle bounds, DrawPanel panel) {
 		m_drawPanel = panel;
 		m_gameArea = new Rectangle(bounds);
 		m_featureLocations = new ArrayList<Point>();
-		//m_targetList = new ArrayList<Point>();
-
-		rectangleExtractors = Executors.newCachedThreadPool();
 
 		try {
 			m_robot = new Robot();
@@ -105,18 +100,14 @@ public class Botz {
 	private void drawFeatures(List<Rectangle> recs) {
 
 		Graphics2D g2d = (Graphics2D) m_currentImage.getGraphics();
-
-		// if we know where the rabbit is, highlight it.
-		if (m_rabbitRectangle != null) {
-			g2d.setColor(Color.yellow);
-			g2d.drawRect(m_rabbitRectangle.x, m_rabbitRectangle.y, m_rabbitRectangle.width, m_rabbitRectangle.height);
-		}
 		
 		// draw circles about all the targets
 		for (Point p : m_featureLocations)
 		{
 			if (p == m_rabbitLoc)
 				g2d.setColor(Color.yellow);
+			else if (p == m_birdLoc)
+				g2d.setColor(Color.cyan);
 			else
 				g2d.setColor(Color.magenta);
 			g2d.fillOval(p.x - 8, p.y - 8, 16, 16);
@@ -162,53 +153,70 @@ public class Botz {
 
 	}
 
-	private List<Rectangle> extractFeatures(BufferedImage image) {
+	private List<Rectangle> extractFeatures(BufferedImage m_image, Rectangle m_area) {
 
 		// reset rabbit each frame
 		m_rabbitRectangle = null;
-
+		
 		List<Rectangle> features = new ArrayList<Rectangle>();
 
-		// divide the image into separate areas with black borders
-		List<Rectangle> sections = new ArrayList<Rectangle>(4);// =
-		// this.divideImage(image, 1);
-		List<Future<Pair<List<Rectangle>, Rectangle>>> asyncResults = new ArrayList<Future<Pair<List<Rectangle>, Rectangle>>>();
+		// check each pixel in the search area
+		for (int x = 0; x < m_area.x + m_area.width; x += Botz.horzRes) {
+			nextPixel: for (int y = 0; y < m_area.y + m_area.height; y += Botz.verticalRes) {
 
-		// create four tasks to search each area
-		sections.add(new Rectangle(0, 0, image.getWidth() / 2, image.getHeight()));
-		sections.add(new Rectangle(image.getWidth() / 2, 0, image.getWidth() / 2, image.getHeight()));
+				if (isWhite(m_image.getRGB(x, y))) {
 
-		// start threads
-		for (Rectangle bounds : sections) {
-			FeatureExtractor fxt = new FeatureExtractor(bounds, image);
-			asyncResults.add(rectangleExtractors.submit(fxt));
-		}
+					// skip pixel if it is inside a previous rectangle
+					for (Rectangle oldRect : features) {
+						if (oldRect.contains(x, y)) {
+							continue nextPixel;
+						}
+					}
 
-		// wait for thread results
-		for (Future<Pair<List<Rectangle>, Rectangle>> ar : asyncResults) {
-			try {
-				Pair<List<Rectangle>, Rectangle> results = ar.get();
-				features.addAll(results.first);
+					// SpatialRectangle newRect = new
+					// SpatialRectangle(expandRect(y, x));
+					Rectangle newRectangle = expandRectangle(y, x, m_image);
 
-				// check if this thread found the rabbit
-				if (results.second != null) {
-					m_rabbitRectangle = results.second;
+					// only add large rectangles
+					if (newRectangle.width > 10 && newRectangle.height > 10) {
+						Cell c = new Cell(m_image.getRGB(newRectangle.x, newRectangle.y, newRectangle.width,
+								newRectangle.height, null, 0, newRectangle.width));
+
+						// update rabbit location
+						if (c.getCount() > 350) {
+							m_rabbitRectangle = newRectangle;
+							continue nextPixel;
+						}
+
+						// skip overlapping rectangles
+						for (Rectangle otherRect : features) {
+							if (newRectangle.intersects(otherRect)) {
+								continue nextPixel;
+							}
+						}
+
+						// add this feature to the list of rectangles
+						features.add(newRectangle);
+					}
 				}
-
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			} catch (ExecutionException e) {
-				e.printStackTrace();
 			}
 		}
 		
 		// the rabbit is not returned as part of the features list, so add it here
 		if (m_rabbitRectangle != null)
+		{
 			features.add(m_rabbitRectangle);
-
+			
+			// set the initial rabbit location if it is null
+			if (m_rabbitLoc == null)
+				m_rabbitLoc = getCenter(m_rabbitRectangle);
+		}
+		
+		
+		
 		return features;
-
 	}
+
 
 	private void filterImage(BufferedImage image) {
 
@@ -290,8 +298,6 @@ public class Botz {
 	}
 	
 
-	
-
 	private Point getLowestFromZone(List<Point> featureLocations, Rectangle targetZone) {
 		
 		double highestY = Double.MIN_VALUE;
@@ -331,7 +337,8 @@ public class Botz {
 		filterImage(m_currentImage);
 
 		// extract a list of features from the image
-		List<Rectangle> rectList = extractFeatures(m_currentImage);
+		Rectangle bounds = new Rectangle(0,0,m_currentImage.getWidth(), m_currentImage.getHeight());
+		List<Rectangle> rectList = extractFeatures(m_currentImage, bounds);
 
 		updateFeatureLocations(rectList, m_featureLocations);
 
@@ -367,8 +374,21 @@ public class Botz {
 
 					// if the target point is inside a rectangle, it is assumed
 					// to be the former target
-					target.x = (int) rect.getCenterX();
-					target.y = (int) rect.getCenterY();
+					int centerX = (int) rect.getCenterX();
+					int centerY = (int) rect.getCenterY();
+					
+					// check for special targets
+					int deltaX = target.x - centerX;
+					//int deltaY = target.y - centerY;
+					
+					if (m_birdLoc == null && deltaX > birdSpeedLimit)
+					{
+						m_birdLoc = target;
+					}
+					
+					// update target location
+					target.x = centerX;
+					target.y = centerY;
 
 					// check the next target
 					break;
@@ -378,9 +398,11 @@ public class Botz {
 			// if an associated feature was not found, remove the target
 			if (!targetUpdated) {
 				
-				// if rabbitLoc is about to be removed from the list, also set that to null
+				// remove special features if they go missing
 				if (target == m_rabbitLoc)
 					m_rabbitLoc = null;
+				if (target == m_birdLoc)
+					m_birdLoc = null;
 				
 				//m_targetList.remove(target);
 				itr.remove();
@@ -416,88 +438,6 @@ public class Botz {
 	
 	/** Static methods **/
 	
-	
-	/**
-	 * Find the item in the list that is closest to the point
-	 * 
-	 * @param list
-	 * @param point
-	 * @return
-	 */
-	@SuppressWarnings("unused")
-	private static Rectangle findNearest(List<Rectangle> list, Rectangle point) {
-
-		Rectangle closestFeature = null;
-		if (list.size() > 2) {
-
-			int closest = Integer.MAX_VALUE;
-
-			for (Rectangle r : list) {
-				int distance = (int) Point2D.distance(r.getCenterX(), r.getCenterY(), point.getCenterX(), point
-						.getCenterY());
-
-				if (distance < closest) {
-					closest = distance;
-					closestFeature = r;
-				}
-			}
-		}
-
-		if (closestFeature == null) {
-			return null;
-		}
-		return closestFeature;
-	}
-	
-
-	// return the point in list that is above and closest to the basePoint
-	@SuppressWarnings("unused")
-	private static Point getNearestPoint(List<Point> pointList, Point basePoint)
-	{
-		Point closestPoint = null;
-		int closest = Integer.MAX_VALUE;
-
-		for (Point p : pointList) {
-			if (p != basePoint)
-			{
-				int distance = (int) Point2D.distance(p.x, p.y, basePoint.x, basePoint.y);
-
-				if (distance < closest) {
-					closest = distance;
-					closestPoint = p;
-				}
-			}
-		}
-		
-		return closestPoint;
-	}
-	
-	/**
-	 * @param pointList
-	 * @param basePoint
-	 * @return the nearest point in pointList above basePoint on the screen
-	 */
-	private static Point getNearestVirtical(List<Point> pointList, Point basePoint)
-	{
-		Point closestPoint = null;
-		int closest = Integer.MAX_VALUE;
-
-		for (Point p : pointList) {
-			if (p != basePoint)
-			{
-				//int distance = basePoint.y - p.y;
-				int distance = (int) Point2D.distance(p.x, p.y, basePoint.x, basePoint.y);
-
-				if (distance < closest && p.y <= basePoint.y) {
-					closest = distance;
-					closestPoint = p;
-				}
-			}
-		}
-		
-		return closestPoint;
-	}
-
 
 	public static Point getCenter(Rectangle rect) {
 		return new Point((int) rect.getCenterX(), (int) rect.getCenterY());
@@ -523,4 +463,98 @@ public class Botz {
 		return rgb;
 	}
 
+	
+	private static boolean[] checkBorders(Rectangle r, BufferedImage image) {
+		boolean[] bArray = new boolean[4];
+
+		// check top
+
+		int row = r.y - 1;
+
+		if (row > 0) {
+			for (int c = r.x; c <= r.x + r.width; c++) {
+				if (isWhite(image.getRGB(c, row))) {
+					bArray[0] = true;
+					break;
+				}
+			}
+		}
+
+		// check right
+
+		int col = r.x + r.width + 1;
+		if (col < image.getWidth()) {
+			for (row = r.y; row <= r.y + r.height; row++) {
+				if (isWhite(image.getRGB(col, row))) {
+					bArray[1] = true;
+					break;
+				}
+			}
+		}
+
+		// check bottom
+
+		row = r.y + r.height + 1;
+		if (row < image.getHeight()) {
+			for (int c = r.x; c <= r.x + r.width; c++) {
+				if (isWhite(image.getRGB(c, row))) {
+					bArray[2] = true;
+					break;
+				}
+			}
+		}
+		
+		// check left
+		col = r.x - 1;
+		if (col > 0) {
+			for (row = r.y; row <= r.y + r.height; row++) {
+				if (isWhite(image.getRGB(col, row))) {
+					bArray[3] = true;
+					break;
+				}
+			}
+		}
+		return bArray;
+	}
+
+	
+	private static Rectangle expandRectangle(int row, int col, BufferedImage image) {
+
+		Rectangle r = new Rectangle(col, row, 1, 1);
+
+		boolean[] bA = checkBorders(r, image);
+
+		// if there is a white pixel on any side of the rectangle, grow the
+		// rectangel in that direction
+		while (bA[0] || bA[1] || bA[2] || bA[3]) {
+			// grow up
+			if (bA[0]) {
+				r.y -= 1;
+				r.height++;
+			}
+
+			// grow right
+			if (bA[1]) {
+				r.width++;
+			}
+
+			// grow down
+			if (bA[2]) {
+				r.height++;
+			}
+
+			// grow left
+			if (bA[3]) {
+				r.x -= 1;
+				r.width++;
+			}
+
+			// check around the borders again
+			bA = checkBorders(r, image);
+		}
+
+		return r;
+
+	}
+	
 }
