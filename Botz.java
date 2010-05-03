@@ -99,6 +99,8 @@ public class Botz {
 				deltax = rabbitLoc.x - prevRabbit.x;
 				deltay = rabbitLoc.y - prevRabbit.y;
 				prevRabbit = rabbitLoc;
+				g2d.setColor(Color.GREEN);
+				g2d.fillRect(rabbitLoc.x, rabbitLoc.y, 15, 15);
 
 			}
 
@@ -161,7 +163,45 @@ public class Botz {
 		return lowest;
 
 	}
+	
+	
+	
+	
+	private SpatialRect findLowestBest (List<SpatialRect> list, Graphics2D g2d)
+	{
 
+		Double greatest = Double.MIN_VALUE;
+		SpatialRect lowest = null;
+
+		for (SpatialRect s: list)
+		{
+
+			if (s.getCenterY() > greatest)
+			{
+				greatest = s.getCenterY();
+				lowest = s;
+			}
+
+		}
+		
+		Rectangle rect = new Rectangle (rabbit.x - 100, rabbitLoc.y - 20, 200, 55);
+		g2d.draw(rect);
+		
+		for (SpatialRect s: list)
+		{
+			
+			if (s.intersects(rect) || rect.contains(s))
+			{
+				lowest = s;
+			}
+		
+			
+		}
+
+		return lowest;
+
+	}
+	
 
 
 	private Point findBestMove(List<SpatialRect> list, Point rabbitLocation) {
@@ -191,7 +231,8 @@ public class Botz {
 				}
 			}
 
-			SpatialRect lowest = findLowest(myList);
+			//SpatialRect lowest = findLowest(myList);
+			SpatialRect lowest = findLowestBest(myList, g2d);
 
 			if (lowest == null)
 			{
