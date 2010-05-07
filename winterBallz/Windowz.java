@@ -80,7 +80,7 @@ public class Windowz extends JFrame implements KeyListener {
 
 	public void initialize() {
 
-		this.setPreferredSize(new Dimension(800, 600));
+		this.setPreferredSize(new Dimension(650, 550));
 		this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		this.addKeyListener(this);
 
