@@ -24,6 +24,7 @@ public class Botz {
 	private static final int vertValueMult = 2;
 	
 	private boolean m_allowMove = true;
+	private boolean m_scaleImage = false;
 
 	private BufferedImage m_currentImage;
 	private BufferedImage m_scaledImage;
@@ -36,18 +37,25 @@ public class Botz {
 	//private Rectangle m_birdRectangle;
 	
 	// special feature locations
+	private Rabbit m_rabbit;
 	private Point m_rabbitLocation;
-	private Point m_birdLocation;
 	
 	
-	private List<Point> m_featureLocations;
+	private List<Point> m_featureLocations= new ArrayList<Point>();
+	private List<GameFeature> m_persistentFeatures = new ArrayList<GameFeature>();
 	private Point m_currentTarget;
 	private Rectangle m_targetZone = new Rectangle (0, 0, 0, 240);
 
+	
+	
+	/**
+	 * Constructor.
+	 * @param bounds
+	 * @param panel
+	 */
 	public Botz(Rectangle bounds, DrawPanel panel) {
 		m_drawPanel = panel;
 		m_gameArea = new Rectangle(bounds);
-		m_featureLocations = new ArrayList<Point>();
 
 		try {
 			m_robot = new Robot();
@@ -68,16 +76,22 @@ public class Botz {
 
 		Graphics2D g2d = (Graphics2D) m_currentImage.getGraphics();
 		
-		// draw circles about all the targets
-		for (Point p : m_featureLocations)
+//		//m_persistentFeatures.clear();
+//		for (Rectangle r : recs)
+//		{
+//			m_persistentFeatures.add(new Bell(r));
+//		}
+		
+		for (Rectangle r : recs){
+			g2d.drawRect(r.x, r.y, r.width, r.height);
+		}
+		
+		
+		
+		
+		for (GameFeature gf : m_persistentFeatures)
 		{
-			if (p == m_rabbitLocation)
-				g2d.setColor(Color.yellow);
-			else if (p == m_birdLocation)
-				g2d.setColor(Color.cyan);
-			else
-				g2d.setColor(Color.magenta);
-			g2d.fillOval(p.x - 8, p.y - 8, 16, 16);
+			gf.draw(g2d);
 		}
 		
 		// draw the target zone
@@ -94,33 +108,47 @@ public class Botz {
 
 		// put the filtered image in the panel and draw it
 
-		// scale the image to fit the draw panel size
-		Dimension drawSize = m_drawPanel.getSize();
-		int width = m_currentImage.getWidth();
-		int height = m_currentImage.getHeight();
-		double aspectRatio = (double) width / (double) height;
-		int newWidth = drawSize.width;
-		int newHeight = (int) (newWidth / aspectRatio);
-
-		// Create new (blank) image of required (scaled) size
-		m_scaledImage = new BufferedImage(drawSize.width, drawSize.height, BufferedImage.TYPE_INT_RGB);
-
-		// Paint scaled version of image to new image
-		Graphics2D graphics2D = m_scaledImage.createGraphics();
-		graphics2D.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-		graphics2D.drawImage(m_currentImage, 0, 0, newWidth, newHeight, null);
-
-		// clean up
-		graphics2D.dispose();
-
-		m_drawPanel.setImage(m_scaledImage);
-
-		// draw the screen immediately
-		m_drawPanel.paintImmediately(0, 0, m_scaledImage.getWidth(), m_scaledImage.getHeight());
+		if (m_scaleImage)
+			{
+			// scale the image to fit the draw panel size
+			Dimension drawSize = m_drawPanel.getSize();
+			int width = m_currentImage.getWidth();
+			int height = m_currentImage.getHeight();
+			double aspectRatio = (double) width / (double) height;
+			int newWidth = drawSize.width;
+			int newHeight = (int) (newWidth / aspectRatio);
+	
+			// Create new (blank) image of required (scaled) size
+			m_scaledImage = new BufferedImage(drawSize.width, drawSize.height, BufferedImage.TYPE_INT_RGB);
+	
+			// Paint scaled version of image to new image
+			Graphics2D graphics2D = m_scaledImage.createGraphics();
+			graphics2D.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+			graphics2D.drawImage(m_currentImage, 0, 0, newWidth, newHeight, null);
+	
+			// clean up
+			graphics2D.dispose();
+	
+			m_drawPanel.setImage(m_scaledImage);
+	
+			// draw the screen immediately
+			m_drawPanel.paintImmediately(0, 0, m_scaledImage.getWidth(), m_scaledImage.getHeight());
+			
+		}
+		else {
+			m_drawPanel.setImage(m_currentImage);
+			m_drawPanel.paintImmediately(0, 0, m_currentImage.getWidth(), m_currentImage.getHeight());
+		}
 
 	}
 
 	private List<Rectangle> extractFeatures(BufferedImage m_image, Rectangle m_area) {
+		
+		// mark all game features as not updated;
+		for (GameFeature gf : m_persistentFeatures)
+		{
+			gf.updated = false;
+		}
 
 		// reset rabbit each frame
 		m_rabbitRectangle = null;
@@ -143,43 +171,105 @@ public class Botz {
 					// SpatialRectangle newRect = new
 					// SpatialRectangle(expandRect(y, x));
 					Rectangle newRectangle = expandRectangle(y, x, m_image);
+					
+					// skip overlapping rectangles
+					for (Rectangle otherRect : features) {
+						if (newRectangle.intersects(otherRect)) {
+							continue nextPixel;
+						}
+					}
+					
 
 					// only add large rectangles
 					if (newRectangle.width > 10 && newRectangle.height > 10) {
-						Cell c = new Cell(m_image.getRGB(newRectangle.x, newRectangle.y, newRectangle.width,
-								newRectangle.height, null, 0, newRectangle.width));
+						
+						// check if the rectangle intersects with an old feature
+						GameFeature gf;
+						
+						for (Iterator<GameFeature> itr = m_persistentFeatures.iterator(); itr.hasNext(); ) {
+							
+							gf = itr.next();
+							
+							// if the new rectangle intersects a game feature, assume that they are the same feature and move gf
+							// TODO this null check should not be needed but it is...
+							if (newRectangle.intersects(gf)){
+								
+								// move to newRectangle position
+								gf.move(newRectangle);
+//								System.out.println("Game feature updated");
+								
+								break nextPixel;
+							}
+						}
+						
+						// if the code reaches this point, the newRectangle did not intersect any of the old game features
+						// try to determine what kind of game feature it is and add that to the persistent feature list
+						
+						//int whiteCount = countPixels(m_currentImage, newRectangle, Color.white);
+						int blackCount = countPixels(m_currentImage, newRectangle, Color.black);
 
 						// update rabbit rectangle
-						if (c.getCount() > 350) {
-							m_rabbitRectangle = newRectangle;
+						if (blackCount > 350) {
+							m_rabbit = new Rabbit(newRectangle);
+							m_persistentFeatures.add(m_rabbit);
 						}
-
-						// skip overlapping rectangles
-						for (Rectangle otherRect : features) {
-							if (newRectangle.intersects(otherRect)) {
-								continue nextPixel;
-							}
+						else
+						{
+							m_persistentFeatures.add(new Bell(newRectangle));
 						}
 
 						// add this feature to the list of rectangles
+						//features.add(newRectangle);
+					}
+					else
+					{
+						// check for game over screen and stop mouse movement if it is found
+						// TODO: implement game over checking
+						int whiteCount = countPixels(m_currentImage, newRectangle, Color.white);
+						int blackCount = countPixels(m_currentImage, newRectangle, Color.black);
+						
+						// the angle brackets around the "play again" button have 15 white pixels and 21 black pixels with the current filter
+						if (whiteCount > 10 && whiteCount < 20 && blackCount > 10 && blackCount < 25)
+						{
+							//System.out.println("Game over");
+							//m_allowMove = false;
+						}
 						features.add(newRectangle);
+						
 					}
 				}
+			} // end inner pixel loop
+		} // end outer pixel loop	
+		
+		
+		// remove orphaned gameFeatures from the persistent feature list
+		// TODO figure out why removing orphaned game features is not working
+		for (Iterator<GameFeature> itr = m_persistentFeatures.iterator(); itr.hasNext(); ) {
+			GameFeature gf = itr.next();
+			if (gf.updated == false){
+				itr.remove();
+				//System.out.println("GF removed");
 			}
 		}
 		
-//		// update the rabbit location
-//		if (m_rabbitRectangle != null)
-//		{
-//			
-//			// set the initial rabbit location if it is null
-//			if (m_rabbitLocation == null)
-//				m_rabbitLocation = getCenter(m_rabbitRectangle);
-//		}
-		
-		
 		
 		return features;
+	}
+	
+	
+	@SuppressWarnings("unused")
+	private int countPixels(BufferedImage image, Rectangle bounds, Color color)
+	{
+		int[] rgbArray = image.getRGB(bounds.x, bounds.y, bounds.width, bounds.height, null, 0, bounds.width);
+		
+		int count = 0;
+		for (int i : rgbArray) {
+			if (i == color.getRGB()) {
+				count++;
+			}
+		}
+		
+		return count;
 	}
 
 	private void filterImage(BufferedImage image) {

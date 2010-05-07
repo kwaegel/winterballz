@@ -81,6 +81,7 @@ public class Windowz extends JFrame implements KeyListener {
 	public void initialize() {
 
 		this.setPreferredSize(new Dimension(650, 550));
+		this.setPreferredSize(new Dimension(770, 550));
 		this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		this.addKeyListener(this);
 
@@ -89,7 +90,7 @@ public class Windowz extends JFrame implements KeyListener {
 
 		m_drawPanel = new DrawPanel();
 
-		m_drawPanel.setPreferredSize(new Dimension(500, 500));
+		m_drawPanel.setPreferredSize(new Dimension(750, 500));
 
 		m_calibrateButton = new JButton("Calibrate");
 		m_calibrateButton.setFocusable(false);
