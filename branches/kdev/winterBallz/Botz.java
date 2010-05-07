@@ -10,6 +10,9 @@ import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.Robot;
 import java.awt.image.BufferedImage;
+import java.awt.image.Raster;
+import java.awt.image.WritableRaster;
+import java.io.Console;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -22,6 +25,8 @@ public class Botz {
 	public static final int birdSpeedLimit = 3;
 	private static final int hrozValueMult = 10;
 	private static final int vertValueMult = 2;
+	private static final int maxBirdHeight = 20;
+	//private static final int expandIncrement = 3;
 	
 	private boolean m_allowMove = true;
 	private boolean m_scaleImage = false;
@@ -38,6 +43,7 @@ public class Botz {
 	
 	// special feature locations
 	private Rabbit m_rabbit;
+	private Bird m_bird;
 	private Point m_rabbitLocation;
 	
 	
@@ -168,8 +174,6 @@ public class Botz {
 						}
 					}
 
-					// SpatialRectangle newRect = new
-					// SpatialRectangle(expandRect(y, x));
 					Rectangle newRectangle = expandRectangle(y, x, m_image);
 					
 					// skip overlapping rectangles
@@ -204,19 +208,64 @@ public class Botz {
 						
 						// if the code reaches this point, the newRectangle did not intersect any of the old game features
 						// try to determine what kind of game feature it is and add that to the persistent feature list
+						// TODO with filtering at 185, only rabbits and birds have an eye (black hole surrounded by white). Try to find this.
+						// Can then distinguish birds from rabbits by size (the rabbit is taller then the bird).
 						
-						//int whiteCount = countPixels(m_currentImage, newRectangle, Color.white);
-						int blackCount = countPixels(m_currentImage, newRectangle, Color.black);
-
-						// update rabbit rectangle
-						if (blackCount > 350) {
-							m_rabbit = new Rabbit(newRectangle);
-							m_persistentFeatures.add(m_rabbit);
-						}
-						else
+//						int whiteCount = countPixels(m_currentImage, newRectangle, Color.white);
+//						int blackCount = countPixels(m_currentImage, newRectangle, Color.black);
+//						float whiteBlackRatio = (float) whiteCount / blackCount;
+						
+						
+						boolean solid = isSolid(m_currentImage, newRectangle);
+						if (solid)
 						{
 							m_persistentFeatures.add(new Bell(newRectangle));
 						}
+						else
+						{
+//							System.out.println("not solid");
+							m_rabbit = new Rabbit(newRectangle);
+							m_persistentFeatures.add(m_rabbit);
+							
+//							if (newRectangle.height > maxBirdHeight)
+//							{
+//								m_rabbit = new Rabbit(newRectangle);
+//								m_persistentFeatures.add(m_rabbit);
+//							}
+//							else
+//							{
+//								m_bird = new Bird(newRectangle);
+//								m_persistentFeatures.add(m_bird);
+//							}
+						}
+						
+						
+//						System.out.println(whiteCount + " / " + blackCount + " = " + whiteBlackRatio);
+
+						// decide what type of game feature this rectangle is
+						//if (blackCount > 330) {
+//						if (whiteBlackRatio < 1.33f && whiteCount > 450) {
+//							m_rabbit = new Rabbit(newRectangle);
+//							m_persistentFeatures.add(m_rabbit);
+////							System.out.println(whiteCount + " / " + blackCount + " = " + whiteBlackRatio);
+//						}
+//						else //if ( blackCount <= 330 && whiteCount < 460)
+//						{	
+//							// all bells have a black count < 300 and a white count < 460
+//							m_persistentFeatures.add(new Bell(newRectangle));
+//						}
+						
+//						if (whiteBlackRatio > 2.0f)
+//						{
+//							m_persistentFeatures.add(new Bell(newRectangle));
+//						}
+//						else
+//						{
+//							m_rabbit = new Rabbit(newRectangle);
+//							m_persistentFeatures.add(m_rabbit);
+//						}
+
+						
 
 						// add this feature to the list of rectangles
 						//features.add(newRectangle);
@@ -256,8 +305,49 @@ public class Botz {
 		return features;
 	}
 	
+	/**
+	 * Returns if an image is solid with no inside curves. This is only true of bells
+	 * @param image
+	 * @param bounds
+	 * @return
+	 */
+	private boolean isSolid(BufferedImage image, Rectangle bounds)
+	{
+		int maxWidth = bounds.x + bounds.width;
+		int maxHeight = bounds.y + bounds.height;
+		
+		// for each row
+		int numberOfTransitions = 0;
+		int previousColor, currentColor;
+		for (int row = bounds.x; row < maxHeight; row++)
+		{
+			previousColor = image.getRGB(0, row);
+			// for each column in the row
+			for (int col = 0; col < maxWidth; col++){
+				
+				currentColor = image.getRGB(col, row);
+				
+				// if the new color differs (only need to check one cell)
+				if (currentColor != previousColor)
+				{
+					numberOfTransitions++;
+					
+					// stop and return as soon as there are more then 2 transitions in a row
+					if (numberOfTransitions > 2)
+						return false;	
+				}
+				
+				previousColor = currentColor;
+			}
+//			if (numberOfTransitions > 0)
+//				System.out.println(numberOfTransitions);
+		}
+		
+		
+		return true;
+	}
 	
-	@SuppressWarnings("unused")
+	
 	private int countPixels(BufferedImage image, Rectangle bounds, Color color)
 	{
 		int[] rgbArray = image.getRGB(bounds.x, bounds.y, bounds.width, bounds.height, null, 0, bounds.width);
@@ -278,7 +368,8 @@ public class Botz {
 			for (int y = 0; y < image.getHeight(); y++) {
 				int rgb = image.getRGB(x, y);
 				int[] RGB = rgbToRGBArray(rgb);
-				if (image.getHeight() - y < 30 || RGB[0] < 200 || RGB[1] < 200 || RGB[2] < 200) {
+				// note: filter out the lower 30 pixels, as the ground confuses the feature extraction
+				if (image.getHeight() - y < 30 || RGB[0] < 185 || RGB[1] < 185 || RGB[2] < 185) {
 					image.setRGB(x, y, 0);
 				} else {
 					image.setRGB(x, y, Color.WHITE.getRGB());

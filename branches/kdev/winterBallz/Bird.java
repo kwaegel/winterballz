@@ -15,10 +15,8 @@ public class Bird extends GameFeature {
 
 	public void draw(Graphics2D g2d)
 	{
-		oldDrawColor = g2d.getColor();
 		g2d.setColor(birdColor);
-		g2d.drawRect(x, y, width, height);
-		g2d.setColor(oldDrawColor);
+		g2d.drawRect(x-1, y-1, width+1, height+1);
 	}
 
 }
