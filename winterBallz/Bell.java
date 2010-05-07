@@ -16,7 +16,7 @@ public class Bell extends GameFeature {
 	public void draw(Graphics2D g2d)
 	{
 		g2d.setColor(bellColor);
-		g2d.drawRect(x, y, width, height);
+		g2d.drawRect(x-1, y-1, width+1, height+1);
 	}
 
 }
